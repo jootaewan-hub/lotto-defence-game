@@ -134,7 +134,8 @@ export function createUi(simulation: GameSimulation): UiHandle {
     const selected = selectedSlot === null ? null : state.board[selectedSlot];
     if (!selected) {
       query("#selected-name").textContent = "유닛 선택 없음";
-      query("#selected-detail").textContent = `소환 ${simulation.summonCost}G · 조각 ${simulation.meta.growthShards}`;
+      query("#selected-detail").textContent =
+        `타워 ${state.board.length}개 · 소환 제한 없음 · 소환 ${simulation.summonCost}G · 조각 ${simulation.meta.growthShards}`;
     } else {
       const definition = getUnitDefinition(selected.definitionId);
       const rarity = getRarity(definition.rarity);

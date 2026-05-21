@@ -10,8 +10,6 @@ export { createDefaultMetaProgress, getSkillEffectTotal, purchaseSkill, skillTre
 export type * from "./types";
 export { buildWaves } from "./waves";
 
-const BOARD_SIZE = 16;
-
 export function createInitialRunState(meta: MetaProgress = createDefaultMetaProgress()): RunState {
   return {
     wave: 0,
@@ -20,7 +18,7 @@ export function createInitialRunState(meta: MetaProgress = createDefaultMetaProg
     freeSummons: 0,
     baseHealth: 20,
     maxBaseHealth: 20,
-    board: Array.from({ length: BOARD_SIZE }, () => null),
+    board: [],
     activeBuffs: [],
     status: "ready",
     defeatedEnemies: 0,

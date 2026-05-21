@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { BOARD, DESIGN_WIDTH, PATH_POINTS, getBoardSlotAt, getBoardSlotCenter, getPathPosition } from "./geometry";
+import { DESIGN_WIDTH, PATH_POINTS, TOWER_FIELD, TOWER_RADIUS, getPathPosition } from "./geometry";
 import type { GameSimulation, SimulationEvent } from "./simulation";
 import { getRarity } from "./rarities";
 import { getUnitDefinition } from "./units";
@@ -13,8 +13,9 @@ export class GameScene extends Phaser.Scene {
   private hoverPanel!: Phaser.GameObjects.Container;
   private hoverPanelBg!: Phaser.GameObjects.Graphics;
   private hoverText!: Phaser.GameObjects.Text;
-  private unitLabels: Phaser.GameObjects.Text[] = [];
+  private unitLabels = new Map<string, Phaser.GameObjects.Text>();
   private selectedSlot: number | null = null;
+  private draggingSlot: number | null = null;
 
   constructor(
     simulation: GameSimulation,
@@ -41,21 +42,6 @@ export class GameScene extends Phaser.Scene {
     });
     this.hoverPanel = this.add.container(0, 0, [this.hoverPanelBg, this.hoverText]).setDepth(20).setVisible(false);
 
-    for (let index = 0; index < BOARD.columns * BOARD.rows; index += 1) {
-      const center = getBoardSlotCenter(index);
-      const label = this.add
-        .text(center.x, center.y, "", {
-          align: "center",
-          color: "#1f2a44",
-          fontFamily: "Arial, sans-serif",
-          fontSize: "10px",
-          fontStyle: "700",
-        })
-        .setOrigin(0.5)
-        .setDepth(5);
-      this.unitLabels.push(label);
-    }
-
     this.add
       .text(DESIGN_WIDTH / 2, 38, "운빨 디펜스", {
         color: "#26324f",
@@ -66,18 +52,30 @@ export class GameScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     this.input.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
-      const slot = getBoardSlotAt({ x: pointer.x, y: pointer.y });
+      const slot = this.findTowerAt(pointer.x, pointer.y);
       if (slot === null) {
+        this.selectedSlot = null;
+        this.onSelectionChange(null);
         return;
       }
-      this.handleBoardTap(slot);
+      this.selectedSlot = slot;
+      this.draggingSlot = slot;
+      this.onSelectionChange(slot);
     });
 
     this.input.on("pointermove", (pointer: Phaser.Input.Pointer) => {
+      if (this.draggingSlot !== null) {
+        this.simulation.moveUnitTo(this.draggingSlot, pointer.x, pointer.y);
+      }
       this.updateHoverPanel(pointer.x, pointer.y);
     });
 
+    this.input.on("pointerup", () => {
+      this.draggingSlot = null;
+    });
+
     this.input.on("pointerout", () => {
+      this.draggingSlot = null;
       this.hoverPanel.setVisible(false);
     });
   }
@@ -103,26 +101,14 @@ export class GameScene extends Phaser.Scene {
     return this.selectedSlot;
   }
 
-  private handleBoardTap(slot: number): void {
-    const selectedUnit = this.selectedSlot === null ? null : this.simulation.state.board[this.selectedSlot];
-    const targetUnit = this.simulation.state.board[slot];
-
-    if (this.selectedSlot !== null && selectedUnit && !targetUnit) {
-      this.simulation.moveUnit(this.selectedSlot, slot);
-      this.selectedSlot = slot;
-    } else {
-      this.selectedSlot = targetUnit ? slot : null;
-    }
-
-    this.onSelectionChange(this.selectedSlot);
-  }
-
   private drawWorld(): void {
     this.worldGraphics.clear();
 
-    this.worldGraphics.fillStyle(0xdff7f0, 1);
-    this.worldGraphics.fillRoundedRect(28, 70, DESIGN_WIDTH - 56, 344, 22);
-    this.worldGraphics.lineStyle(28, 0xfbd38d, 1);
+    this.worldGraphics.fillGradientStyle(0xdff7f0, 0xf8fafc, 0xdbeafe, 0xfef3c7, 1);
+    this.worldGraphics.fillRoundedRect(24, 66, DESIGN_WIDTH - 48, 356, 22);
+    this.worldGraphics.lineStyle(31, 0x334155, 0.18);
+    this.worldGraphics.strokeRoundedRect(37, 81, 316, 316, 26);
+    this.worldGraphics.lineStyle(28, 0xf9c56d, 1);
     this.worldGraphics.beginPath();
     this.worldGraphics.moveTo(PATH_POINTS[0]!.x, PATH_POINTS[0]!.y);
     for (const point of PATH_POINTS.slice(1)) {
@@ -132,10 +118,10 @@ export class GameScene extends Phaser.Scene {
     this.worldGraphics.lineStyle(4, 0xffffff, 0.82);
     this.worldGraphics.strokePath();
 
-    this.worldGraphics.fillStyle(0xb7f0df, 0.86);
-    this.worldGraphics.fillRoundedRect(88, 132, 214, 214, 24);
+    this.worldGraphics.fillStyle(0xe0fbf1, 0.94);
+    this.worldGraphics.fillRoundedRect(TOWER_FIELD.x - 8, TOWER_FIELD.y - 8, TOWER_FIELD.width + 16, TOWER_FIELD.height + 16, 28);
     this.worldGraphics.lineStyle(2, 0x7dd3fc, 0.55);
-    this.worldGraphics.strokeRoundedRect(88, 132, 214, 214, 24);
+    this.worldGraphics.strokeRoundedRect(TOWER_FIELD.x - 8, TOWER_FIELD.y - 8, TOWER_FIELD.width + 16, TOWER_FIELD.height + 16, 28);
 
     for (const enemy of this.simulation.enemies) {
       const position = getPathPosition(enemy.progress);
@@ -156,23 +142,11 @@ export class GameScene extends Phaser.Scene {
 
   private drawBoard(): void {
     this.boardGraphics.clear();
-    this.boardGraphics.fillStyle(0xeefcff, 0.72);
-    this.boardGraphics.fillRoundedRect(96, 140, 198, 198, 20);
+    const seenLabels = new Set<string>();
 
-    for (let index = 0; index < BOARD.columns * BOARD.rows; index += 1) {
-      const center = getBoardSlotCenter(index);
-      const x = center.x - BOARD.cell / 2;
-      const y = center.y - BOARD.cell / 2;
+    for (let index = 0; index < this.simulation.state.board.length; index += 1) {
       const unit = this.simulation.state.board[index];
-
-      this.boardGraphics.lineStyle(index === this.selectedSlot ? 3 : 1, index === this.selectedSlot ? 0xf59e0b : 0xcbd5e1, 1);
-      this.boardGraphics.fillStyle(0xffffff, 0.94);
-      this.boardGraphics.fillRoundedRect(x, y, BOARD.cell, BOARD.cell, 10);
-      this.boardGraphics.strokeRoundedRect(x, y, BOARD.cell, BOARD.cell, 10);
-
-      const label = this.unitLabels[index]!;
       if (!unit) {
-        label.setText("");
         continue;
       }
 
@@ -180,17 +154,35 @@ export class GameScene extends Phaser.Scene {
       const rarity = getRarity(definition.rarity);
       const roleIcon = definition.role === "single" ? "S" : definition.role === "area" ? "A" : "B";
       const rarityColor = Phaser.Display.Color.HexStringToColor(rarity.color).color;
+      const radius = TOWER_RADIUS + Math.min(4, Math.floor(index / 8));
 
+      if (index === this.selectedSlot) {
+        this.boardGraphics.lineStyle(3, 0xf59e0b, 0.95);
+        this.boardGraphics.strokeCircle(unit.x, unit.y, radius + 6);
+      }
+      this.boardGraphics.fillStyle(0xffffff, 0.76);
+      this.boardGraphics.fillCircle(unit.x + 1, unit.y + 3, radius + 4);
       this.boardGraphics.fillStyle(rarityColor, 1);
-      this.boardGraphics.fillCircle(center.x, center.y - 5, 15);
+      this.boardGraphics.fillCircle(unit.x, unit.y, radius);
       this.boardGraphics.fillStyle(0xffffff, 0.72);
-      this.boardGraphics.fillCircle(center.x - 5, center.y - 10, 4);
+      this.boardGraphics.fillCircle(unit.x - radius * 0.34, unit.y - radius * 0.36, radius * 0.28);
+
+      const label = this.getUnitLabel(unit.instanceId);
+      seenLabels.add(unit.instanceId);
+      label.setPosition(unit.x, unit.y + 1);
       label.setText(`${roleIcon}\n${rarity.label}`);
+    }
+
+    for (const [id, label] of this.unitLabels) {
+      if (!seenLabels.has(id)) {
+        label.destroy();
+        this.unitLabels.delete(id);
+      }
     }
   }
 
   private updateHoverPanel(x: number, y: number): void {
-    const slot = getBoardSlotAt({ x, y });
+    const slot = this.findTowerAt(x, y);
     if (slot !== null && this.simulation.state.board[slot]) {
       const unit = this.simulation.state.board[slot]!;
       const definition = getUnitDefinition(unit.definitionId);
@@ -245,6 +237,37 @@ export class GameScene extends Phaser.Scene {
         return Math.hypot(position.x - x, position.y - y) <= radius;
       }) ?? null
     );
+  }
+
+  private findTowerAt(x: number, y: number): number | null {
+    for (let index = this.simulation.state.board.length - 1; index >= 0; index -= 1) {
+      const unit = this.simulation.state.board[index]!;
+      if (Math.hypot(unit.x - x, unit.y - y) <= TOWER_RADIUS + 8) {
+        return index;
+      }
+    }
+    return null;
+  }
+
+  private getUnitLabel(instanceId: string): Phaser.GameObjects.Text {
+    const existing = this.unitLabels.get(instanceId);
+    if (existing) {
+      return existing;
+    }
+    const label = this.add
+      .text(0, 0, "", {
+        align: "center",
+        color: "#172033",
+        fontFamily: "Arial, sans-serif",
+        fontSize: "9px",
+        fontStyle: "900",
+        stroke: "#ffffff",
+        strokeThickness: 2,
+      })
+      .setOrigin(0.5)
+      .setDepth(5);
+    this.unitLabels.set(instanceId, label);
+    return label;
   }
 
   private playCombatEffects(events: SimulationEvent[]): void {

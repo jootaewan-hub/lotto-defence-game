@@ -14,13 +14,18 @@ export const PATH_POINTS: Point[] = [
   { x: 54, y: 98 },
 ];
 
-export const BOARD = {
-  x: 105,
-  y: 149,
-  columns: 4,
-  rows: 4,
-  cell: 40,
-  gap: 8,
+export const TOWER_RADIUS = 18;
+
+export const TOWER_SPAWN = {
+  x: 195,
+  y: 239,
+};
+
+export const TOWER_FIELD = {
+  x: 86,
+  y: 130,
+  width: 218,
+  height: 218,
 };
 
 const segments = PATH_POINTS.slice(0, -1).map((point, index) => {
@@ -50,27 +55,22 @@ export function getPathPosition(progress: number): Point {
   return PATH_POINTS[PATH_POINTS.length - 1]!;
 }
 
-export function getBoardSlotCenter(index: number): Point {
-  const col = index % BOARD.columns;
-  const row = Math.floor(index / BOARD.columns);
-  return {
-    x: BOARD.x + col * (BOARD.cell + BOARD.gap) + BOARD.cell / 2,
-    y: BOARD.y + row * (BOARD.cell + BOARD.gap) + BOARD.cell / 2,
-  };
-}
-
-export function getBoardSlotAt(point: Point): number | null {
-  const localX = point.x - BOARD.x;
-  const localY = point.y - BOARD.y;
-  const stride = BOARD.cell + BOARD.gap;
-  const col = Math.floor(localX / stride);
-  const row = Math.floor(localY / stride);
-  const insideCellX = localX - col * stride <= BOARD.cell;
-  const insideCellY = localY - row * stride <= BOARD.cell;
-
-  if (col < 0 || col >= BOARD.columns || row < 0 || row >= BOARD.rows || !insideCellX || !insideCellY) {
-    return null;
+export function getSpawnPosition(index: number): Point {
+  if (index === 0) {
+    return TOWER_SPAWN;
   }
 
-  return row * BOARD.columns + col;
+  const angle = index * 2.399963;
+  const radius = 8 + Math.sqrt(index) * 8;
+  return clampTowerPosition({
+    x: TOWER_SPAWN.x + Math.cos(angle) * radius,
+    y: TOWER_SPAWN.y + Math.sin(angle) * radius,
+  });
+}
+
+export function clampTowerPosition(point: Point): Point {
+  return {
+    x: Math.max(TOWER_FIELD.x + TOWER_RADIUS, Math.min(TOWER_FIELD.x + TOWER_FIELD.width - TOWER_RADIUS, point.x)),
+    y: Math.max(TOWER_FIELD.y + TOWER_RADIUS, Math.min(TOWER_FIELD.y + TOWER_FIELD.height - TOWER_RADIUS, point.y)),
+  };
 }

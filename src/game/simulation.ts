@@ -1,4 +1,4 @@
-import { getBoardSlotCenter, getPathPosition } from "./geometry";
+import { clampTowerPosition, getPathPosition, getSpawnPosition } from "./geometry";
 import {
   buildWaves,
   createInitialRunState,
@@ -28,7 +28,6 @@ export type SimulationEvent =
   | { type: "runEnded"; status: "won" | "lost" };
 
 const BASE_SUMMON_COST = 28;
-const CENTER_SLOTS = [5, 6, 9, 10, 1, 2, 4, 7, 8, 11, 13, 14, 0, 3, 12, 15];
 
 export class GameSimulation {
   readonly waves = buildWaves();
@@ -99,12 +98,6 @@ export class GameSimulation {
   }
 
   summonToFirstEmpty(): boolean {
-    const emptyIndex = CENTER_SLOTS.find((slot) => this.state.board[slot] === null) ?? -1;
-    if (emptyIndex < 0) {
-      this.events.push({ type: "message", text: "보드가 가득 찼어요." });
-      return false;
-    }
-
     if (this.state.freeSummons > 0) {
       this.state = { ...this.state, freeSummons: this.state.freeSummons - 1 };
     } else if (this.state.gold >= this.summonCost) {
@@ -115,19 +108,22 @@ export class GameSimulation {
     }
 
     const unit = this.summonSampler();
+    const position = getSpawnPosition(this.state.board.length);
     const board = [...this.state.board];
-    board[emptyIndex] = {
+    board.push({
       instanceId: `unit-${this.unitSequence += 1}`,
       definitionId: unit.id,
       cooldownMs: 250,
-    };
+      x: position.x,
+      y: position.y,
+    });
     this.state = { ...this.state, board };
     this.events.push({ type: "message", text: `${getRarity(unit.rarity).label} ${unit.name} 소환!` });
     return true;
   }
 
   moveUnit(from: number, to: number): boolean {
-    if (from === to || !this.state.board[from]) {
+    if (from === to || !this.state.board[from] || !this.state.board[to]) {
       return false;
     }
 
@@ -135,6 +131,19 @@ export class GameSimulation {
     const target = board[to];
     board[to] = board[from];
     board[from] = target;
+    this.state = { ...this.state, board };
+    return true;
+  }
+
+  moveUnitTo(index: number, x: number, y: number): boolean {
+    const unit = this.state.board[index];
+    if (!unit) {
+      return false;
+    }
+
+    const position = clampTowerPosition({ x, y });
+    const board = [...this.state.board];
+    board[index] = { ...unit, x: position.x, y: position.y };
     this.state = { ...this.state, board };
     return true;
   }
@@ -147,7 +156,7 @@ export class GameSimulation {
     const definition = getUnitDefinition(unit.definitionId);
     const refund = 10 + getRarityIndex(definition.rarity) * 7;
     const board = [...this.state.board];
-    board[slot] = null;
+    board.splice(slot, 1);
     this.state = { ...this.state, board, gold: this.state.gold + refund };
     this.events.push({ type: "message", text: `${definition.name} 판매 +${refund}G` });
     return true;
@@ -169,7 +178,7 @@ export class GameSimulation {
     const source = this.state.board[targetSlot]!;
     try {
       this.pendingMerge = {
-        sourceSlots: matchingSlots.slice(0, 3),
+        sourceSlots: [targetSlot, ...matchingSlots.filter((matchingSlot) => matchingSlot !== targetSlot)].slice(0, 3),
         candidates: createMergeCandidates(source.definitionId, this.rng),
       };
       return this.pendingMerge;
@@ -191,13 +200,21 @@ export class GameSimulation {
 
     const [targetSlot, ...consumedSlots] = this.pendingMerge.sourceSlots;
     const board = [...this.state.board];
-    for (const slot of consumedSlots) {
-      board[slot] = null;
+    const sourceUnit = board[targetSlot!];
+    if (!sourceUnit) {
+      return false;
     }
-    board[targetSlot!] = {
+    for (const slot of [...consumedSlots].sort((a, b) => b - a)) {
+      board.splice(slot, 1);
+    }
+    const adjustedTargetSlot = board.findIndex((unit) => unit.instanceId === sourceUnit.instanceId);
+    const insertIndex = adjustedTargetSlot >= 0 ? adjustedTargetSlot : Math.min(targetSlot!, board.length);
+    board[insertIndex] = {
       instanceId: `unit-${this.unitSequence += 1}`,
       definitionId: candidate.id,
       cooldownMs: 150,
+      x: sourceUnit.x,
+      y: sourceUnit.y,
     };
 
     this.state = { ...this.state, board };
@@ -256,24 +273,21 @@ export class GameSimulation {
 
   private attackEnemies(deltaMs: number): void {
     const supportCount = this.state.board.reduce((count, unit) => {
-      return unit && getUnitDefinition(unit.definitionId).role === "support" ? count + 1 : count;
+      return getUnitDefinition(unit.definitionId).role === "support" ? count + 1 : count;
     }, 0);
     const supportSpeedMultiplier = Math.min(1.25, 1 + supportCount * 0.025);
     const attackBonus = 1 + getSkillEffectTotal(this.meta, "attackBonus");
     const attackBuff = this.getBuffMultiplier("attack");
     const speedBuff = this.getBuffMultiplier("attackSpeed") * supportSpeedMultiplier;
 
-    this.state.board.forEach((unit, slot) => {
-      if (!unit) {
-        return;
-      }
+    this.state.board.forEach((unit) => {
       unit.cooldownMs -= deltaMs * speedBuff;
       if (unit.cooldownMs > 0) {
         return;
       }
 
       const definition = getUnitDefinition(unit.definitionId);
-      const target = this.findTarget(slot, definition.range);
+      const target = this.findTarget(unit, definition.range);
       unit.cooldownMs = definition.attackSpeed;
       if (!target) {
         return;
@@ -281,7 +295,7 @@ export class GameSimulation {
 
       const critical = this.rng.next() < definition.criticalChance;
       const damage = Math.round(definition.attack * attackBonus * attackBuff * (critical ? 1.75 : 1));
-      const origin = getBoardSlotCenter(slot);
+      const origin = { x: unit.x, y: unit.y };
       const targetPosition = getPathPosition(target.progress);
       this.events.push({ type: "attack", from: origin, to: targetPosition, critical });
       if (definition.role === "area") {
@@ -302,8 +316,8 @@ export class GameSimulation {
     this.collectDefeatedEnemies();
   }
 
-  private findTarget(slot: number, range: number): EnemyState | null {
-    const origin = getBoardSlotCenter(slot);
+  private findTarget(unit: { x: number; y: number }, range: number): EnemyState | null {
+    const origin = { x: unit.x, y: unit.y };
     return (
       this.enemies
         .filter((enemy) => {

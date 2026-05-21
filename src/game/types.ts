@@ -53,6 +53,8 @@ export interface UnitInstance {
   instanceId: string;
   definitionId: string;
   cooldownMs: number;
+  x: number;
+  y: number;
 }
 
 export type RunStatus = "ready" | "running" | "won" | "lost";
@@ -64,7 +66,7 @@ export interface RunState {
   freeSummons: number;
   baseHealth: number;
   maxBaseHealth: number;
-  board: Array<UnitInstance | null>;
+  board: UnitInstance[];
   activeBuffs: ActiveBuff[];
   status: RunStatus;
   defeatedEnemies: number;

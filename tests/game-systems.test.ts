@@ -13,6 +13,7 @@ import {
   skillTree,
 } from "../src/game/systems";
 import { GameSimulation } from "../src/game/simulation";
+import { TOWER_SPAWN } from "../src/game/geometry";
 import { UNIT_DEFINITIONS } from "../src/game/units";
 
 describe("lotto defence game systems", () => {
@@ -95,21 +96,26 @@ describe("lotto defence game systems", () => {
     expect(afterSecond.growthShards).toBe(0);
   });
 
-  test("summoned towers prefer the center slots and can swap positions freely", () => {
+  test("summoned towers are unlimited and start near the center", () => {
     const simulation = new GameSimulation(createDefaultMetaProgress(), createSeededRng(11));
+    simulation.state = { ...simulation.state, gold: 10_000 };
 
+    for (let index = 0; index < 30; index += 1) {
+      expect(simulation.summonToFirstEmpty()).toBe(true);
+    }
+
+    expect(simulation.state.board).toHaveLength(30);
+    expect(simulation.state.board[0]!.x).toBe(TOWER_SPAWN.x);
+    expect(simulation.state.board[0]!.y).toBe(TOWER_SPAWN.y);
+  });
+
+  test("summoned towers can be freely repositioned", () => {
+    const simulation = new GameSimulation(createDefaultMetaProgress(), createSeededRng(11));
     simulation.summonToFirstEmpty();
-    simulation.summonToFirstEmpty();
 
-    expect(simulation.state.board[5]).not.toBeNull();
-    expect(simulation.state.board[6]).not.toBeNull();
-
-    const first = simulation.state.board[5]!;
-    const second = simulation.state.board[6]!;
-
-    expect(simulation.moveUnit(5, 6)).toBe(true);
-    expect(simulation.state.board[5]).toEqual(second);
-    expect(simulation.state.board[6]).toEqual(first);
+    expect(simulation.moveUnitTo(0, 260, 310)).toBe(true);
+    expect(simulation.state.board[0]!.x).toBe(260);
+    expect(simulation.state.board[0]!.y).toBe(310);
   });
 
   test("wave timer damages base from surviving loop monsters instead of path exits", () => {
