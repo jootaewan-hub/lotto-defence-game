@@ -24,6 +24,7 @@ export function createUi(simulation: GameSimulation): UiHandle {
         <div id="game-root" class="game-root"></div>
         <div class="top-hud">
           <span id="wave-pill">Wave 0/30</span>
+          <span id="timer-pill">시간 0초</span>
           <span id="gold-pill">0G</span>
           <span id="heart-pill">HP 20</span>
         </div>
@@ -126,6 +127,7 @@ export function createUi(simulation: GameSimulation): UiHandle {
   function render(): void {
     const state = simulation.state;
     query("#wave-pill").textContent = `Wave ${state.wave}/30`;
+    query("#timer-pill").textContent = `시간 ${Math.ceil(state.waveTimeRemainingMs / 1000)}초`;
     query("#gold-pill").textContent = `${state.gold}G · 무료 ${state.freeSummons}`;
     query("#heart-pill").textContent = `HP ${state.baseHealth}/${state.maxBaseHealth}`;
 
@@ -137,7 +139,8 @@ export function createUi(simulation: GameSimulation): UiHandle {
       const definition = getUnitDefinition(selected.definitionId);
       const rarity = getRarity(definition.rarity);
       query("#selected-name").textContent = `${definition.name}`;
-      query("#selected-detail").textContent = `${rarity.label} · 공격 ${definition.attack} · ${definition.skill}`;
+      query("#selected-detail").textContent =
+        `${rarity.label} · ${definition.attackType} · 공격 ${definition.attack} · 속도 ${(1000 / definition.attackSpeed).toFixed(2)}/초 · 치명 ${(definition.criticalChance * 100).toFixed(1)}%`;
     }
 
     query<HTMLButtonElement>("#wave-button").disabled = !simulation.canStartWave;

@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import {
   RARITIES,
   buildWaves,
+  createDefaultMetaProgress,
   createInitialRunState,
   createMergeCandidates,
   createSeededRng,
@@ -11,6 +12,7 @@ import {
   resolveJackpotReward,
   skillTree,
 } from "../src/game/systems";
+import { GameSimulation } from "../src/game/simulation";
 import { UNIT_DEFINITIONS } from "../src/game/units";
 
 describe("lotto defence game systems", () => {
@@ -91,5 +93,36 @@ describe("lotto defence game systems", () => {
 
     expect(afterSecond.unlockedSkills).toEqual([firstAttack.id, secondAttack.id]);
     expect(afterSecond.growthShards).toBe(0);
+  });
+
+  test("summoned towers prefer the center slots and can swap positions freely", () => {
+    const simulation = new GameSimulation(createDefaultMetaProgress(), createSeededRng(11));
+
+    simulation.summonToFirstEmpty();
+    simulation.summonToFirstEmpty();
+
+    expect(simulation.state.board[5]).not.toBeNull();
+    expect(simulation.state.board[6]).not.toBeNull();
+
+    const first = simulation.state.board[5]!;
+    const second = simulation.state.board[6]!;
+
+    expect(simulation.moveUnit(5, 6)).toBe(true);
+    expect(simulation.state.board[5]).toEqual(second);
+    expect(simulation.state.board[6]).toEqual(first);
+  });
+
+  test("wave timer damages base from surviving loop monsters instead of path exits", () => {
+    const simulation = new GameSimulation(createDefaultMetaProgress(), createSeededRng(19));
+    simulation.startNextWave();
+    const startHealth = simulation.state.baseHealth;
+    const duration = simulation.waves[0]!.durationMs;
+
+    simulation.update(duration + 1_000);
+
+    expect(simulation.state.waveTimeRemainingMs).toBe(0);
+    expect(simulation.state.baseHealth).toBeLessThan(startHealth);
+    expect(simulation.enemies).toHaveLength(0);
+    expect(simulation.canStartWave).toBe(true);
   });
 });

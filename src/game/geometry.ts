@@ -7,20 +7,19 @@ export interface Point {
 }
 
 export const PATH_POINTS: Point[] = [
-  { x: 34, y: 104 },
-  { x: 350, y: 104 },
-  { x: 350, y: 246 },
-  { x: 42, y: 246 },
-  { x: 42, y: 362 },
-  { x: 346, y: 362 },
+  { x: 54, y: 98 },
+  { x: 336, y: 98 },
+  { x: 336, y: 380 },
+  { x: 54, y: 380 },
+  { x: 54, y: 98 },
 ];
 
 export const BOARD = {
-  x: 29,
-  y: 426,
+  x: 105,
+  y: 149,
   columns: 4,
   rows: 4,
-  cell: 76,
+  cell: 40,
   gap: 8,
 };
 
@@ -33,7 +32,8 @@ const segments = PATH_POINTS.slice(0, -1).map((point, index) => {
 export const PATH_LENGTH = segments.reduce((total, segment) => total + segment.length, 0);
 
 export function getPathPosition(progress: number): Point {
-  const targetDistance = Math.max(0, Math.min(1, progress)) * PATH_LENGTH;
+  const loopedProgress = ((progress % 1) + 1) % 1;
+  const targetDistance = loopedProgress * PATH_LENGTH;
   let walked = 0;
 
   for (const segment of segments) {

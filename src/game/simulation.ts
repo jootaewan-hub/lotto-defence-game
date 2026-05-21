@@ -22,10 +22,13 @@ export interface MergePrompt {
 export type SimulationEvent =
   | { type: "message"; text: string }
   | { type: "jackpot"; reward: JackpotReward; text: string }
+  | { type: "attack"; from: { x: number; y: number }; to: { x: number; y: number }; critical: boolean }
+  | { type: "damage"; at: { x: number; y: number }; amount: number; critical: boolean }
   | { type: "waveComplete"; wave: number }
   | { type: "runEnded"; status: "won" | "lost" };
 
 const BASE_SUMMON_COST = 28;
+const CENTER_SLOTS = [5, 6, 9, 10, 1, 2, 4, 7, 8, 11, 13, 14, 0, 3, 12, 15];
 
 export class GameSimulation {
   readonly waves = buildWaves();
@@ -75,7 +78,7 @@ export class GameSimulation {
       return;
     }
 
-    this.state = { ...this.state, wave: nextWave, status: "running" };
+    this.state = { ...this.state, wave: nextWave, waveTimeRemainingMs: wave.durationMs, status: "running" };
     this.remainingSpawns = wave.enemyCount;
     this.spawnTimerMs = 0;
     this.currentWaveActive = true;
@@ -91,11 +94,12 @@ export class GameSimulation {
     this.spawnEnemies(deltaMs);
     this.moveEnemies(deltaMs);
     this.attackEnemies(deltaMs);
+    this.tickWaveTimer(deltaMs);
     this.checkWaveCompletion();
   }
 
   summonToFirstEmpty(): boolean {
-    const emptyIndex = this.state.board.findIndex((slot) => slot === null);
+    const emptyIndex = CENTER_SLOTS.find((slot) => this.state.board[slot] === null) ?? -1;
     if (emptyIndex < 0) {
       this.events.push({ type: "message", text: "보드가 가득 찼어요." });
       return false;
@@ -123,13 +127,14 @@ export class GameSimulation {
   }
 
   moveUnit(from: number, to: number): boolean {
-    if (from === to || !this.state.board[from] || this.state.board[to]) {
+    if (from === to || !this.state.board[from]) {
       return false;
     }
 
     const board = [...this.state.board];
+    const target = board[to];
     board[to] = board[from];
-    board[from] = null;
+    board[from] = target;
     this.state = { ...this.state, board };
     return true;
   }
@@ -221,43 +226,31 @@ export class GameSimulation {
       return;
     }
 
-    this.spawnTimerMs -= deltaMs;
-    if (this.spawnTimerMs > 0) {
-      return;
-    }
-
     const wave = this.waves[this.state.wave - 1]!;
-    const baseHp = wave.isBoss ? 280 : 46;
-    const hp = Math.round(baseHp * wave.healthMultiplier);
-    this.enemies.push({
-      id: `enemy-${this.enemySequence += 1}`,
-      wave: wave.number,
-      hp,
-      maxHp: hp,
-      progress: 0,
-      speed: (wave.isBoss ? 0.045 : 0.068) * wave.speedMultiplier,
-      rewardGold: wave.isBoss ? 75 + wave.number * 3 : 8 + Math.floor(wave.number / 2),
-      isBoss: wave.isBoss,
-    });
+    this.spawnTimerMs -= deltaMs;
 
-    this.remainingSpawns -= 1;
-    this.spawnTimerMs = wave.isBoss ? 900 : 520;
+    while (this.remainingSpawns > 0 && this.spawnTimerMs <= 0) {
+      const baseHp = wave.isBoss ? 280 : 46;
+      const hp = Math.round(baseHp * wave.healthMultiplier);
+      this.enemies.push({
+        id: `enemy-${this.enemySequence += 1}`,
+        wave: wave.number,
+        hp,
+        maxHp: hp,
+        progress: this.rng.next(),
+        speed: (wave.isBoss ? 0.07 : 0.12) * wave.speedMultiplier,
+        rewardGold: wave.isBoss ? 75 + wave.number * 3 : 8 + Math.floor(wave.number / 2),
+        isBoss: wave.isBoss,
+      });
+
+      this.remainingSpawns -= 1;
+      this.spawnTimerMs += wave.isBoss ? 900 : Math.max(220, Math.floor(wave.durationMs / wave.enemyCount));
+    }
   }
 
   private moveEnemies(deltaMs: number): void {
-    for (let index = this.enemies.length - 1; index >= 0; index -= 1) {
-      const enemy = this.enemies[index]!;
+    for (const enemy of this.enemies) {
       enemy.progress += enemy.speed * (deltaMs / 1000);
-
-      if (enemy.progress >= 1) {
-        this.enemies.splice(index, 1);
-        const damage = enemy.isBoss ? 5 : 1;
-        const baseHealth = Math.max(0, this.state.baseHealth - damage);
-        this.state = { ...this.state, baseHealth };
-        if (baseHealth <= 0) {
-          this.endRun("lost");
-        }
-      }
     }
   }
 
@@ -286,17 +279,23 @@ export class GameSimulation {
         return;
       }
 
-      const damage = Math.round(definition.attack * attackBonus * attackBuff);
+      const critical = this.rng.next() < definition.criticalChance;
+      const damage = Math.round(definition.attack * attackBonus * attackBuff * (critical ? 1.75 : 1));
+      const origin = getBoardSlotCenter(slot);
+      const targetPosition = getPathPosition(target.progress);
+      this.events.push({ type: "attack", from: origin, to: targetPosition, critical });
       if (definition.role === "area") {
-        const targetPosition = getPathPosition(target.progress);
         for (const enemy of this.enemies) {
           const position = getPathPosition(enemy.progress);
           if (Math.hypot(position.x - targetPosition.x, position.y - targetPosition.y) <= 72) {
-            enemy.hp -= Math.round(damage * 0.75);
+            const areaDamage = Math.round(damage * 0.75);
+            enemy.hp -= areaDamage;
+            this.events.push({ type: "damage", at: position, amount: areaDamage, critical });
           }
         }
       } else {
         target.hp -= damage;
+        this.events.push({ type: "damage", at: targetPosition, amount: damage, critical });
       }
     });
 
@@ -351,16 +350,52 @@ export class GameSimulation {
     }
   }
 
-  private checkWaveCompletion(): void {
-    if (!this.currentWaveActive || this.remainingSpawns > 0 || this.enemies.length > 0) {
+  private tickWaveTimer(deltaMs: number): void {
+    if (!this.currentWaveActive) {
       return;
     }
 
+    const nextTime = Math.max(0, this.state.waveTimeRemainingMs - deltaMs);
+    this.state = { ...this.state, waveTimeRemainingMs: nextTime };
+    if (nextTime === 0) {
+      this.resolveTimedWaveEnd();
+    }
+  }
+
+  private checkWaveCompletion(): void {
+    if (!this.currentWaveActive || this.remainingSpawns > 0 || this.enemies.length > 0 || this.state.waveTimeRemainingMs > 0) {
+      return;
+    }
+    this.completeCurrentWave();
+  }
+
+  private resolveTimedWaveEnd(): void {
+    if (!this.currentWaveActive) {
+      return;
+    }
+
+    const survivorDamage = this.enemies.reduce((total, enemy) => total + (enemy.isBoss ? 5 : 1), 0);
+    this.enemies.splice(0);
+    this.remainingSpawns = 0;
+    const baseHealth = Math.max(0, this.state.baseHealth - survivorDamage);
+    this.state = { ...this.state, baseHealth };
+    if (survivorDamage > 0) {
+      this.events.push({ type: "message", text: `남은 몬스터 피해 -${survivorDamage} HP` });
+    }
+    if (baseHealth <= 0) {
+      this.endRun("lost");
+      return;
+    }
+
+    this.completeCurrentWave();
+  }
+
+  private completeCurrentWave(): void {
     const completedWave = this.state.wave;
     const isBoss = completedWave % 5 === 0;
     const growthShardsEarned = this.state.growthShardsEarned + (isBoss ? 1 : 0);
     this.currentWaveActive = false;
-    this.state = { ...this.state, growthShardsEarned };
+    this.state = { ...this.state, waveTimeRemainingMs: 0, growthShardsEarned };
     this.events.push({ type: "waveComplete", wave: completedWave });
 
     if (completedWave >= 30) {

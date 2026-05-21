@@ -2,5 +2,5 @@ node_modules/
 dist/
 .vite/
 .playwright-mcp/
-lotto-defence-mobile-*.png
+lotto-defence-*.png
 *.log

@@ -26,8 +26,10 @@ export interface UnitDefinition {
   name: string;
   rarity: RarityId;
   role: UnitRole;
+  attackType: string;
   attack: number;
   attackSpeed: number;
+  criticalChance: number;
   range: number;
   skill: string;
 }
@@ -37,6 +39,7 @@ export interface WaveDefinition {
   enemyCount: number;
   healthMultiplier: number;
   speedMultiplier: number;
+  durationMs: number;
   isBoss: boolean;
 }
 
@@ -56,6 +59,7 @@ export type RunStatus = "ready" | "running" | "won" | "lost";
 
 export interface RunState {
   wave: number;
+  waveTimeRemainingMs: number;
   gold: number;
   freeSummons: number;
   baseHealth: number;

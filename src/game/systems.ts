@@ -15,6 +15,7 @@ const BOARD_SIZE = 16;
 export function createInitialRunState(meta: MetaProgress = createDefaultMetaProgress()): RunState {
   return {
     wave: 0,
+    waveTimeRemainingMs: 0,
     gold: 100 + getSkillEffectTotal(meta, "startGold"),
     freeSummons: 0,
     baseHealth: 20,
