@@ -85,6 +85,13 @@ export type JackpotReward =
   | { type: "freeSummon"; amount: number }
   | { type: "buff"; stat: BuffStat; multiplier: number; durationMs: number };
 
+export type GoldRewardTier = "small" | "good" | "great" | "epic" | "legendary";
+
+export interface KillGoldReward {
+  amount: number;
+  tier: GoldRewardTier;
+}
+
 export type SkillBranch = "attack" | "economy" | "luck";
 
 export interface SkillNode {

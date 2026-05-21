@@ -1,4 +1,4 @@
-import { clampTowerPosition, getPathPosition, getSpawnPosition } from "./geometry";
+import { TOWER_FIELD, TOWER_SPAWN, clampTowerPosition, getPathPosition } from "./geometry";
 import {
   buildWaves,
   createInitialRunState,
@@ -8,9 +8,10 @@ import {
   getSkillEffectTotal,
   resolveJackpotReward,
   rollJackpotReward,
+  rollKillGoldReward,
 } from "./systems";
 import type { Rng } from "./rng";
-import type { EnemyState, JackpotReward, MetaProgress, RunState, UnitDefinition } from "./types";
+import type { EnemyState, GoldRewardTier, JackpotReward, MetaProgress, RunState, UnitDefinition } from "./types";
 import { getRarity, getRarityIndex } from "./rarities";
 import { getUnitDefinition } from "./units";
 
@@ -22,8 +23,9 @@ export interface MergePrompt {
 export type SimulationEvent =
   | { type: "message"; text: string }
   | { type: "jackpot"; reward: JackpotReward; text: string }
-  | { type: "attack"; from: { x: number; y: number }; to: { x: number; y: number }; critical: boolean }
-  | { type: "damage"; at: { x: number; y: number }; amount: number; critical: boolean }
+  | { type: "attack"; from: { x: number; y: number }; to: { x: number; y: number }; critical: boolean; rarityTier: number; color: string }
+  | { type: "damage"; at: { x: number; y: number }; amount: number; critical: boolean; rarityTier: number }
+  | { type: "goldReward"; at: { x: number; y: number }; amount: number; tier: GoldRewardTier }
   | { type: "waveComplete"; wave: number }
   | { type: "runEnded"; status: "won" | "lost" };
 
@@ -78,7 +80,7 @@ export class GameSimulation {
     }
 
     this.state = { ...this.state, wave: nextWave, waveTimeRemainingMs: wave.durationMs, status: "running" };
-    this.remainingSpawns = wave.enemyCount;
+    this.remainingSpawns = Number.POSITIVE_INFINITY;
     this.spawnTimerMs = 0;
     this.currentWaveActive = true;
     this.events.push({ type: "message", text: wave.isBoss ? `보스 ${nextWave} 웨이브!` : `${nextWave} 웨이브 시작` });
@@ -108,7 +110,7 @@ export class GameSimulation {
     }
 
     const unit = this.summonSampler();
-    const position = getSpawnPosition(this.state.board.length);
+    const position = this.findTowerSpawnPosition();
     const board = [...this.state.board];
     board.push({
       instanceId: `unit-${this.unitSequence += 1}`,
@@ -254,14 +256,13 @@ export class GameSimulation {
         wave: wave.number,
         hp,
         maxHp: hp,
-        progress: this.rng.next(),
+        progress: 0,
         speed: (wave.isBoss ? 0.07 : 0.12) * wave.speedMultiplier,
         rewardGold: wave.isBoss ? 75 + wave.number * 3 : 8 + Math.floor(wave.number / 2),
         isBoss: wave.isBoss,
       });
 
-      this.remainingSpawns -= 1;
-      this.spawnTimerMs += wave.isBoss ? 900 : Math.max(220, Math.floor(wave.durationMs / wave.enemyCount));
+      this.spawnTimerMs += wave.isBoss ? 1_500 : Math.max(360, Math.floor(wave.durationMs / (wave.enemyCount * 2.4)));
     }
   }
 
@@ -287,6 +288,8 @@ export class GameSimulation {
       }
 
       const definition = getUnitDefinition(unit.definitionId);
+      const rarity = getRarity(definition.rarity);
+      const rarityTier = getRarityIndex(definition.rarity);
       const target = this.findTarget(unit, definition.range);
       unit.cooldownMs = definition.attackSpeed;
       if (!target) {
@@ -297,19 +300,19 @@ export class GameSimulation {
       const damage = Math.round(definition.attack * attackBonus * attackBuff * (critical ? 1.75 : 1));
       const origin = { x: unit.x, y: unit.y };
       const targetPosition = getPathPosition(target.progress);
-      this.events.push({ type: "attack", from: origin, to: targetPosition, critical });
+      this.events.push({ type: "attack", from: origin, to: targetPosition, critical, rarityTier, color: rarity.color });
       if (definition.role === "area") {
         for (const enemy of this.enemies) {
           const position = getPathPosition(enemy.progress);
           if (Math.hypot(position.x - targetPosition.x, position.y - targetPosition.y) <= 72) {
             const areaDamage = Math.round(damage * 0.75);
             enemy.hp -= areaDamage;
-            this.events.push({ type: "damage", at: position, amount: areaDamage, critical });
+            this.events.push({ type: "damage", at: position, amount: areaDamage, critical, rarityTier });
           }
         }
       } else {
         target.hp -= damage;
-        this.events.push({ type: "damage", at: targetPosition, amount: damage, critical });
+        this.events.push({ type: "damage", at: targetPosition, amount: damage, critical, rarityTier });
       }
     });
 
@@ -335,14 +338,16 @@ export class GameSimulation {
         continue;
       }
 
+      const position = getPathPosition(enemy.progress);
       this.enemies.splice(index, 1);
       const goldBonus = 1 + getSkillEffectTotal(this.meta, "goldBonus");
-      const gold = Math.round(enemy.rewardGold * goldBonus);
+      const goldReward = rollKillGoldReward(Math.round(enemy.rewardGold * goldBonus), this.rng);
       this.state = {
         ...this.state,
-        gold: this.state.gold + gold,
+        gold: this.state.gold + goldReward.amount,
         defeatedEnemies: this.state.defeatedEnemies + 1,
       };
+      this.events.push({ type: "goldReward", at: position, amount: goldReward.amount, tier: goldReward.tier });
 
       const jackpotChance = 0.05 + getSkillEffectTotal(this.meta, "jackpotChance");
       if (this.rng.next() < jackpotChance) {
@@ -388,7 +393,9 @@ export class GameSimulation {
       return;
     }
 
-    const survivorDamage = this.enemies.reduce((total, enemy) => total + (enemy.isBoss ? 5 : 1), 0);
+    const bossDamage = this.enemies.filter((enemy) => enemy.isBoss).length * 5;
+    const normalSurvivors = this.enemies.filter((enemy) => !enemy.isBoss).length;
+    const survivorDamage = bossDamage + Math.ceil(normalSurvivors / 6);
     this.enemies.splice(0);
     this.remainingSpawns = 0;
     const baseHealth = Math.max(0, this.state.baseHealth - survivorDamage);
@@ -425,6 +432,50 @@ export class GameSimulation {
     return this.state.board
       .map((unit, index) => (unit?.definitionId === source.definitionId ? index : -1))
       .filter((index) => index >= 0);
+  }
+
+  private findTowerSpawnPosition(): { x: number; y: number } {
+    if (this.state.board.length === 0) {
+      return TOWER_SPAWN;
+    }
+
+    const candidates: Array<{ x: number; y: number }> = [];
+    const fieldPadding = 18;
+    for (let y = TOWER_FIELD.y + fieldPadding; y <= TOWER_FIELD.y + TOWER_FIELD.height - fieldPadding; y += 34) {
+      for (let x = TOWER_FIELD.x + fieldPadding; x <= TOWER_FIELD.x + TOWER_FIELD.width - fieldPadding; x += 34) {
+        candidates.push({ x, y });
+      }
+    }
+
+    for (let ring = 1; ring <= 5; ring += 1) {
+      const radius = ring * 24;
+      const steps = 8 + ring * 4;
+      for (let step = 0; step < steps; step += 1) {
+        const angle = (Math.PI * 2 * step) / steps + ring * 0.29;
+        candidates.push(
+          clampTowerPosition({
+            x: TOWER_SPAWN.x + Math.cos(angle) * radius,
+            y: TOWER_SPAWN.y + Math.sin(angle) * radius,
+          }),
+        );
+      }
+    }
+
+    let best = candidates[0] ?? TOWER_SPAWN;
+    let bestScore = Number.NEGATIVE_INFINITY;
+    for (const candidate of candidates) {
+      const minDistance = this.state.board.reduce((closest, unit) => {
+        return Math.min(closest, Math.hypot(unit.x - candidate.x, unit.y - candidate.y));
+      }, Number.POSITIVE_INFINITY);
+      const centerDistance = Math.hypot(candidate.x - TOWER_SPAWN.x, candidate.y - TOWER_SPAWN.y);
+      const score = minDistance - centerDistance * 0.035;
+      if (score > bestScore) {
+        bestScore = score;
+        best = candidate;
+      }
+    }
+
+    return best;
   }
 
   private getBuffMultiplier(stat: "attack" | "attackSpeed"): number {

@@ -273,35 +273,75 @@ export class GameScene extends Phaser.Scene {
   private playCombatEffects(events: SimulationEvent[]): void {
     for (const event of events) {
       if (event.type === "attack") {
-        this.playAttackLine(event.from, event.to, event.critical);
+        this.playAttackLine(event.from, event.to, event.critical, event.rarityTier, event.color);
       }
       if (event.type === "damage") {
-        this.playDamageNumber(event.at, event.amount, event.critical);
+        this.playDamageNumber(event.at, event.amount, event.critical, event.rarityTier);
+      }
+      if (event.type === "goldReward") {
+        this.playGoldReward(event.at, event.amount, event.tier);
       }
     }
   }
 
-  private playAttackLine(from: { x: number; y: number }, to: { x: number; y: number }, critical: boolean): void {
+  private playAttackLine(
+    from: { x: number; y: number },
+    to: { x: number; y: number },
+    critical: boolean,
+    rarityTier: number,
+    color: string,
+  ): void {
     const line = this.add.graphics().setDepth(12);
-    line.lineStyle(critical ? 4 : 2, critical ? 0xf43f5e : 0x38bdf8, critical ? 0.95 : 0.75);
+    const lineColor = critical ? 0xf43f5e : Phaser.Display.Color.HexStringToColor(color).color;
+    line.lineStyle(Math.min(7, 2 + Math.floor(rarityTier / 2) + (critical ? 1 : 0)), lineColor, critical ? 0.98 : 0.78);
     line.beginPath();
     line.moveTo(from.x, from.y);
     line.lineTo(to.x, to.y);
     line.strokePath();
+    if (rarityTier >= 4) {
+      const burst = this.add.graphics().setDepth(13);
+      burst.lineStyle(2, lineColor, 0.72);
+      burst.strokeCircle(to.x, to.y, 12 + rarityTier * 3);
+      burst.strokeCircle(to.x, to.y, 5 + rarityTier);
+      this.tweens.add({
+        targets: burst,
+        alpha: 0,
+        scaleX: 1.35,
+        scaleY: 1.35,
+        duration: 320 + rarityTier * 25,
+        ease: "Cubic.easeOut",
+        onComplete: () => burst.destroy(),
+      });
+    }
+    if (rarityTier >= 6) {
+      for (let index = 0; index < 5; index += 1) {
+        const spark = this.add.circle(to.x, to.y, 2 + rarityTier * 0.25, lineColor, 0.82).setDepth(13);
+        const angle = (Math.PI * 2 * index) / 5;
+        this.tweens.add({
+          targets: spark,
+          x: to.x + Math.cos(angle) * (24 + rarityTier * 4),
+          y: to.y + Math.sin(angle) * (24 + rarityTier * 4),
+          alpha: 0,
+          duration: 360,
+          ease: "Cubic.easeOut",
+          onComplete: () => spark.destroy(),
+        });
+      }
+    }
     this.tweens.add({
       targets: line,
       alpha: 0,
-      duration: 180,
+      duration: 180 + rarityTier * 18,
       onComplete: () => line.destroy(),
     });
   }
 
-  private playDamageNumber(at: { x: number; y: number }, amount: number, critical: boolean): void {
+  private playDamageNumber(at: { x: number; y: number }, amount: number, critical: boolean, rarityTier: number): void {
     const text = this.add
       .text(at.x, at.y - 18, `${critical ? "CRIT " : ""}${amount}`, {
         color: critical ? "#f43f5e" : "#172033",
         fontFamily: "Arial, sans-serif",
-        fontSize: critical ? "15px" : "12px",
+        fontSize: `${critical ? 15 + Math.floor(rarityTier / 2) : 12 + Math.floor(rarityTier / 3)}px`,
         fontStyle: "900",
         stroke: "#ffffff",
         strokeThickness: 3,
@@ -313,6 +353,53 @@ export class GameScene extends Phaser.Scene {
       y: text.y - 26,
       alpha: 0,
       duration: 620,
+      ease: "Cubic.easeOut",
+      onComplete: () => text.destroy(),
+    });
+  }
+
+  private playGoldReward(at: { x: number; y: number }, amount: number, tier: "small" | "good" | "great" | "epic" | "legendary"): void {
+    const tierScale = {
+      small: { size: 12, color: "#f59e0b", lift: 22, burst: 0 },
+      good: { size: 14, color: "#eab308", lift: 28, burst: 10 },
+      great: { size: 17, color: "#f97316", lift: 34, burst: 16 },
+      epic: { size: 20, color: "#ec4899", lift: 42, burst: 24 },
+      legendary: { size: 24, color: "#f43f5e", lift: 52, burst: 34 },
+    }[tier];
+    const text = this.add
+      .text(at.x, at.y - 30, `+${amount}G`, {
+        color: tierScale.color,
+        fontFamily: "Arial, sans-serif",
+        fontSize: `${tierScale.size}px`,
+        fontStyle: "900",
+        stroke: "#ffffff",
+        strokeThickness: 4,
+      })
+      .setOrigin(0.5)
+      .setDepth(15);
+
+    if (tierScale.burst > 0) {
+      const burst = this.add.graphics().setDepth(14);
+      burst.lineStyle(tier === "legendary" ? 4 : 2, Phaser.Display.Color.HexStringToColor(tierScale.color).color, 0.8);
+      burst.strokeCircle(at.x, at.y - 22, tierScale.burst);
+      this.tweens.add({
+        targets: burst,
+        alpha: 0,
+        scaleX: 1.5,
+        scaleY: 1.5,
+        duration: 480,
+        ease: "Cubic.easeOut",
+        onComplete: () => burst.destroy(),
+      });
+    }
+
+    this.tweens.add({
+      targets: text,
+      y: text.y - tierScale.lift,
+      scaleX: tier === "legendary" ? 1.25 : 1,
+      scaleY: tier === "legendary" ? 1.25 : 1,
+      alpha: 0,
+      duration: 780,
       ease: "Cubic.easeOut",
       onComplete: () => text.destroy(),
     });

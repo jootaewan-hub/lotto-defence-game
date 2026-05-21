@@ -10,6 +10,7 @@ import {
   getRarityIndex,
   purchaseSkill,
   resolveJackpotReward,
+  rollKillGoldReward,
   skillTree,
 } from "../src/game/systems";
 import { GameSimulation } from "../src/game/simulation";
@@ -109,6 +110,23 @@ describe("lotto defence game systems", () => {
     expect(simulation.state.board[0]!.y).toBe(TOWER_SPAWN.y);
   });
 
+  test("early summoned towers spread out enough to stay readable", () => {
+    const simulation = new GameSimulation(createDefaultMetaProgress(), createSeededRng(11));
+    simulation.state = { ...simulation.state, gold: 10_000 };
+
+    for (let index = 0; index < 12; index += 1) {
+      simulation.summonToFirstEmpty();
+    }
+
+    for (let outer = 0; outer < simulation.state.board.length; outer += 1) {
+      for (let inner = outer + 1; inner < simulation.state.board.length; inner += 1) {
+        const first = simulation.state.board[outer]!;
+        const second = simulation.state.board[inner]!;
+        expect(Math.hypot(first.x - second.x, first.y - second.y)).toBeGreaterThanOrEqual(28);
+      }
+    }
+  });
+
   test("summoned towers can be freely repositioned", () => {
     const simulation = new GameSimulation(createDefaultMetaProgress(), createSeededRng(11));
     simulation.summonToFirstEmpty();
@@ -130,5 +148,25 @@ describe("lotto defence game systems", () => {
     expect(simulation.state.baseHealth).toBeLessThan(startHealth);
     expect(simulation.enemies).toHaveLength(0);
     expect(simulation.canStartWave).toBe(true);
+  });
+
+  test("monsters keep spawning in a line for the full wave duration", () => {
+    const simulation = new GameSimulation(createDefaultMetaProgress(), createSeededRng(19));
+    const firstWave = simulation.waves[0]!;
+
+    simulation.startNextWave();
+    simulation.update(firstWave.durationMs * 0.9);
+
+    expect(simulation.enemies.length).toBeGreaterThan(firstWave.enemyCount);
+    expect(simulation.enemies.every((enemy) => enemy.progress >= 0)).toBe(true);
+  });
+
+  test("kill gold rewards have larger tiers for higher rolls", () => {
+    const lowReward = rollKillGoldReward(10, { next: () => 0.1 });
+    const highReward = rollKillGoldReward(10, { next: () => 0.99 });
+
+    expect(lowReward.tier).toBe("small");
+    expect(highReward.tier).toBe("legendary");
+    expect(highReward.amount).toBeGreaterThan(lowReward.amount * 3);
   });
 });

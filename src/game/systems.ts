@@ -1,7 +1,7 @@
 import { RARITIES, getRarityIndex } from "./rarities";
 import { createSeededRng, type Rng } from "./rng";
 import { createDefaultMetaProgress, getSkillEffectTotal } from "./skills";
-import type { JackpotReward, MetaProgress, RarityId, RunState, UnitDefinition } from "./types";
+import type { JackpotReward, KillGoldReward, MetaProgress, RarityId, RunState, UnitDefinition } from "./types";
 import { getUnitDefinition, getUnitsByRarity } from "./units";
 
 export { RARITIES, getRarity, getRarityIndex } from "./rarities";
@@ -103,6 +103,23 @@ export function rollJackpotReward(rng: Rng): JackpotReward {
   return rng.next() < 0.5
     ? { type: "buff", stat: "attack", multiplier: 1.35, durationMs: 10_000 }
     : { type: "buff", stat: "attackSpeed", multiplier: 1.3, durationMs: 10_000 };
+}
+
+export function rollKillGoldReward(baseGold: number, rng: Pick<Rng, "next">): KillGoldReward {
+  const roll = rng.next();
+  if (roll >= 0.985) {
+    return { tier: "legendary", amount: Math.round(baseGold * 6) };
+  }
+  if (roll >= 0.94) {
+    return { tier: "epic", amount: Math.round(baseGold * 3.6) };
+  }
+  if (roll >= 0.82) {
+    return { tier: "great", amount: Math.round(baseGold * 2.2) };
+  }
+  if (roll >= 0.55) {
+    return { tier: "good", amount: Math.round(baseGold * 1.45) };
+  }
+  return { tier: "small", amount: baseGold };
 }
 
 export function createRuntimeSeed(): Rng {
