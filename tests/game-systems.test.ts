@@ -35,7 +35,7 @@ describe("lotto defence game systems", () => {
     }
   });
 
-  test("merge candidates are three higher-rarity choices", () => {
+  test("merge candidates are three next-rarity choices", () => {
     const rng = createSeededRng(7);
     const source = UNIT_DEFINITIONS.find((unit) => unit.rarity === "rare" && unit.role === "single");
 
@@ -45,8 +45,16 @@ describe("lotto defence game systems", () => {
 
     expect(candidates).toHaveLength(3);
     for (const candidate of candidates) {
-      expect(getRarityIndex(candidate.rarity)).toBeGreaterThan(getRarityIndex(source!.rarity));
+      expect(getRarityIndex(candidate.rarity)).toBe(getRarityIndex(source!.rarity) + 1);
     }
+  });
+
+  test("immortal units cannot be merged beyond the final rarity", () => {
+    const rng = createSeededRng(7);
+    const source = UNIT_DEFINITIONS.find((unit) => unit.rarity === "immortal" && unit.role === "single");
+
+    expect(source).toBeDefined();
+    expect(() => createMergeCandidates(source!.id, rng)).toThrow(/cannot be merged/i);
   });
 
   test("waves contain 30 rounds and every fifth wave is a boss", () => {
@@ -110,6 +118,46 @@ describe("lotto defence game systems", () => {
     expect(simulation.state.board[0]!.y).toBe(TOWER_SPAWN.y);
   });
 
+  test("summon cost starts at 10G and rises by 1G every ten summons", () => {
+    const simulation = new GameSimulation(createDefaultMetaProgress(), createSeededRng(11));
+    simulation.state = { ...simulation.state, gold: 10_000 };
+
+    expect(simulation.summonCost).toBe(10);
+
+    for (let index = 0; index < 9; index += 1) {
+      expect(simulation.summonToFirstEmpty()).toBe(true);
+    }
+
+    expect(simulation.summonCost).toBe(10);
+    expect(simulation.summonToFirstEmpty()).toBe(true);
+    expect(simulation.summonCost).toBe(11);
+
+    for (let index = 0; index < 10; index += 1) {
+      expect(simulation.summonToFirstEmpty()).toBe(true);
+    }
+
+    expect(simulation.state.board).toHaveLength(20);
+    expect(simulation.summonCost).toBe(12);
+  });
+
+  test("bad summon streaks are corrected with a guaranteed rare unit", () => {
+    const lowRollRng = {
+      next: () => 0,
+      pick<T>(items: readonly T[]): T {
+        return items[0]!;
+      },
+    };
+    const simulation = new GameSimulation(createDefaultMetaProgress(), lowRollRng);
+    simulation.state = { ...simulation.state, gold: 10_000 };
+
+    for (let index = 0; index < 8; index += 1) {
+      simulation.summonToFirstEmpty();
+    }
+
+    const eighthUnit = UNIT_DEFINITIONS.find((unit) => unit.id === simulation.state.board[7]!.definitionId);
+    expect(eighthUnit?.rarity).toBe("rare");
+  });
+
   test("early summoned towers spread out enough to stay readable", () => {
     const simulation = new GameSimulation(createDefaultMetaProgress(), createSeededRng(11));
     simulation.state = { ...simulation.state, gold: 10_000 };
@@ -163,7 +211,7 @@ describe("lotto defence game systems", () => {
 
   test("kill gold rewards have larger tiers for higher rolls", () => {
     const lowReward = rollKillGoldReward(10, { next: () => 0.1 });
-    const highReward = rollKillGoldReward(10, { next: () => 0.99 });
+    const highReward = rollKillGoldReward(10, { next: () => 0.997 });
 
     expect(lowReward.tier).toBe("small");
     expect(highReward.tier).toBe("legendary");

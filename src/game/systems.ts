@@ -50,22 +50,16 @@ export function pickRarity(rng: Rng): RarityId {
 export function createMergeCandidates(sourceUnitId: string, rng: Rng): UnitDefinition[] {
   const source = getUnitDefinition(sourceUnitId);
   const sourceIndex = getRarityIndex(source.rarity);
-  const higherRarities = RARITIES.slice(sourceIndex + 1).map((rarity) => rarity.id);
+  const nextRarity = RARITIES[sourceIndex + 1];
 
-  if (higherRarities.length === 0) {
+  if (!nextRarity) {
     throw new Error("Immortal units cannot be merged into a higher rarity.");
   }
 
-  const candidates: UnitDefinition[] = [];
-  const usedIds = new Set<string>();
-
-  while (candidates.length < 3) {
-    const rarity = rng.pick(higherRarities);
-    const candidate = rng.pick(getUnitsByRarity(rarity));
-    if (!usedIds.has(candidate.id)) {
-      candidates.push(candidate);
-      usedIds.add(candidate.id);
-    }
+  const candidates = [...getUnitsByRarity(nextRarity.id)];
+  for (let index = candidates.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(rng.next() * (index + 1));
+    [candidates[index], candidates[swapIndex]] = [candidates[swapIndex]!, candidates[index]!];
   }
 
   return candidates;
@@ -107,17 +101,17 @@ export function rollJackpotReward(rng: Rng): JackpotReward {
 
 export function rollKillGoldReward(baseGold: number, rng: Pick<Rng, "next">): KillGoldReward {
   const roll = rng.next();
-  if (roll >= 0.985) {
-    return { tier: "legendary", amount: Math.round(baseGold * 6) };
+  if (roll >= 0.995) {
+    return { tier: "legendary", amount: Math.round(baseGold * 4.5) };
   }
-  if (roll >= 0.94) {
-    return { tier: "epic", amount: Math.round(baseGold * 3.6) };
+  if (roll >= 0.97) {
+    return { tier: "epic", amount: Math.round(baseGold * 2.8) };
   }
-  if (roll >= 0.82) {
-    return { tier: "great", amount: Math.round(baseGold * 2.2) };
+  if (roll >= 0.86) {
+    return { tier: "great", amount: Math.round(baseGold * 1.8) };
   }
-  if (roll >= 0.55) {
-    return { tier: "good", amount: Math.round(baseGold * 1.45) };
+  if (roll >= 0.58) {
+    return { tier: "good", amount: Math.round(baseGold * 1.25) };
   }
   return { tier: "small", amount: baseGold };
 }

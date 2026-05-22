@@ -4,16 +4,16 @@ import {
   createInitialRunState,
   createMergeCandidates,
   createRandomRng,
-  createSummonSampler,
   getSkillEffectTotal,
+  pickRarity,
   resolveJackpotReward,
   rollJackpotReward,
   rollKillGoldReward,
 } from "./systems";
 import type { Rng } from "./rng";
-import type { EnemyState, GoldRewardTier, JackpotReward, MetaProgress, RunState, UnitDefinition } from "./types";
+import type { EnemyState, GoldRewardTier, JackpotReward, MetaProgress, RarityId, RunState, UnitDefinition } from "./types";
 import { getRarity, getRarityIndex } from "./rarities";
-import { getUnitDefinition } from "./units";
+import { getUnitDefinition, getUnitsByRarity } from "./units";
 
 export interface MergePrompt {
   sourceSlots: number[];
@@ -29,7 +29,15 @@ export type SimulationEvent =
   | { type: "waveComplete"; wave: number }
   | { type: "runEnded"; status: "won" | "lost" };
 
-const BASE_SUMMON_COST = 28;
+const BASE_SUMMON_COST = 10;
+const SUMMONS_PER_COST_INCREASE = 10;
+const RARE_PITY_THRESHOLD = 7;
+const EPIC_PITY_THRESHOLD = 16;
+const BASE_JACKPOT_CHANCE = 0.025;
+const JACKPOT_PITY_STEP = 0.002;
+const JACKPOT_PITY_MAX_BONUS = 0.06;
+const RARE_RARITY_INDEX = getRarityIndex("rare");
+const EPIC_RARITY_INDEX = getRarityIndex("epic");
 
 export class GameSimulation {
   readonly waves = buildWaves();
@@ -40,24 +48,27 @@ export class GameSimulation {
   pendingMerge: MergePrompt | null = null;
 
   private readonly rng: Rng;
-  private readonly summonSampler: () => UnitDefinition;
   private readonly events: SimulationEvent[] = [];
   private enemySequence = 0;
   private unitSequence = 0;
   private remainingSpawns = 0;
   private spawnTimerMs = 0;
   private currentWaveActive = false;
+  private successfulSummons = 0;
+  private rareDrySummons = 0;
+  private epicDrySummons = 0;
+  private jackpotMisses = 0;
 
   constructor(meta: MetaProgress, rng: Rng = createRandomRng()) {
     this.meta = meta;
     this.rng = rng;
-    this.summonSampler = createSummonSampler(rng);
     this.state = createInitialRunState(meta);
   }
 
   get summonCost(): number {
     const discount = getSkillEffectTotal(this.meta, "summonDiscount");
-    return Math.max(10, Math.round(BASE_SUMMON_COST * (1 - discount)));
+    const summonPressure = Math.floor(this.successfulSummons / SUMMONS_PER_COST_INCREASE);
+    return Math.max(1, Math.round((BASE_SUMMON_COST + summonPressure) * (1 - discount)));
   }
 
   get canStartWave(): boolean {
@@ -109,7 +120,7 @@ export class GameSimulation {
       return false;
     }
 
-    const unit = this.summonSampler();
+    const { unit, pityActivated } = this.rollSummonUnit();
     const position = this.findTowerSpawnPosition();
     const board = [...this.state.board];
     board.push({
@@ -119,8 +130,10 @@ export class GameSimulation {
       x: position.x,
       y: position.y,
     });
+    this.successfulSummons += 1;
     this.state = { ...this.state, board };
-    this.events.push({ type: "message", text: `${getRarity(unit.rarity).label} ${unit.name} 소환!` });
+    const prefix = pityActivated ? "행운 보정! " : "";
+    this.events.push({ type: "message", text: `${prefix}${getRarity(unit.rarity).label} ${unit.name} 소환!` });
     return true;
   }
 
@@ -258,7 +271,9 @@ export class GameSimulation {
         maxHp: hp,
         progress: 0,
         speed: (wave.isBoss ? 0.07 : 0.12) * wave.speedMultiplier,
-        rewardGold: wave.isBoss ? 75 + wave.number * 3 : 8 + Math.floor(wave.number / 2),
+        rewardGold: wave.isBoss
+          ? 58 + Math.floor((wave.number - 1) / 5) * 18 + wave.number
+          : 5 + Math.floor(wave.number / 4) + Math.floor((wave.number - 1) / 5),
         isBoss: wave.isBoss,
       });
 
@@ -349,11 +364,14 @@ export class GameSimulation {
       };
       this.events.push({ type: "goldReward", at: position, amount: goldReward.amount, tier: goldReward.tier });
 
-      const jackpotChance = 0.05 + getSkillEffectTotal(this.meta, "jackpotChance");
+      const jackpotChance = this.getJackpotChance();
       if (this.rng.next() < jackpotChance) {
         const reward = rollJackpotReward(this.rng);
         this.state = resolveJackpotReward(this.state, reward);
+        this.jackpotMisses = 0;
         this.events.push({ type: "jackpot", reward, text: describeJackpot(reward) });
+      } else {
+        this.jackpotMisses += 1;
       }
     }
   }
@@ -482,6 +500,32 @@ export class GameSimulation {
     return this.state.activeBuffs
       .filter((buff) => buff.stat === stat)
       .reduce((total, buff) => total * buff.multiplier, 1);
+  }
+
+  private rollSummonUnit(): { unit: UnitDefinition; pityActivated: boolean } {
+    let rarity: RarityId = pickRarity(this.rng);
+    let pityActivated = false;
+    const rolledRarityIndex = getRarityIndex(rarity);
+
+    if (this.epicDrySummons >= EPIC_PITY_THRESHOLD && rolledRarityIndex < EPIC_RARITY_INDEX) {
+      rarity = "epic";
+      pityActivated = true;
+    } else if (this.rareDrySummons >= RARE_PITY_THRESHOLD && rolledRarityIndex < RARE_RARITY_INDEX) {
+      rarity = "rare";
+      pityActivated = true;
+    }
+
+    const finalRarityIndex = getRarityIndex(rarity);
+    this.rareDrySummons = finalRarityIndex >= RARE_RARITY_INDEX ? 0 : this.rareDrySummons + 1;
+    this.epicDrySummons = finalRarityIndex >= EPIC_RARITY_INDEX ? 0 : this.epicDrySummons + 1;
+
+    return { unit: this.rng.pick(getUnitsByRarity(rarity)), pityActivated };
+  }
+
+  private getJackpotChance(): number {
+    const skillBonus = getSkillEffectTotal(this.meta, "jackpotChance");
+    const pityBonus = Math.min(JACKPOT_PITY_MAX_BONUS, this.jackpotMisses * JACKPOT_PITY_STEP);
+    return Math.min(0.16, BASE_JACKPOT_CHANCE + skillBonus + pityBonus);
   }
 
   private endRun(status: "won" | "lost"): void {
