@@ -11,6 +11,12 @@ export type RarityId =
 
 export type UnitRole = "single" | "area" | "support";
 
+export type UnitAbilityKind = "multishot" | "slow" | "poison" | "freeze" | "berserk";
+
+export type EnemyVariantId = "grunt" | "blade" | "shaman" | "blackguard" | "redguard" | "warlord";
+
+export type TrueBossId = "orc-emperor" | "ogre-king" | "ancient-dragon" | "undead-demon-king";
+
 export type BuffStat = "attack" | "attackSpeed";
 
 export interface Rarity {
@@ -26,6 +32,7 @@ export interface UnitDefinition {
   name: string;
   rarity: RarityId;
   role: UnitRole;
+  uniqueAbility?: UnitAbilityKind;
   attackType: string;
   attack: number;
   attackSpeed: number;
@@ -41,6 +48,8 @@ export interface WaveDefinition {
   speedMultiplier: number;
   durationMs: number;
   isBoss: boolean;
+  isTrueBoss: boolean;
+  trueBossId?: TrueBossId;
 }
 
 export interface ActiveBuff {
@@ -53,6 +62,7 @@ export interface UnitInstance {
   instanceId: string;
   definitionId: string;
   cooldownMs: number;
+  berserkRemainingMs?: number;
   x: number;
   y: number;
 }
@@ -78,6 +88,8 @@ export interface MetaProgress {
   unlockedSkills: string[];
   highestWave: number;
   wins: number;
+  uniqueUnitLevels: Record<string, number>;
+  uniqueUnitExperience: Record<string, number>;
 }
 
 export type JackpotReward =
@@ -92,7 +104,20 @@ export interface KillGoldReward {
   tier: GoldRewardTier;
 }
 
-export type SkillBranch = "attack" | "economy" | "luck";
+export type SkillBranch =
+  | "power"
+  | "haste"
+  | "critical"
+  | "startGold"
+  | "killGold"
+  | "summonCost"
+  | "freeSummon"
+  | "jackpot"
+  | "uniqueChance"
+  | "baseHealth"
+  | "uniqueExperience"
+  | "uniqueAttack"
+  | "skillPower";
 
 export interface SkillNode {
   id: string;
@@ -103,7 +128,23 @@ export interface SkillNode {
   cost: number;
   prerequisite?: string;
   effect: {
-    stat: "attackBonus" | "startGold" | "goldBonus" | "jackpotChance" | "summonDiscount";
+    stat:
+      | "attackBonus"
+      | "attackSpeedBonus"
+      | "criticalChanceBonus"
+      | "startGold"
+      | "startFreeSummons"
+      | "goldBonus"
+      | "jackpotChance"
+      | "summonDiscount"
+      | "uniqueSummonBonus"
+      | "baseHealthBonus"
+      | "leakDamageReduction"
+      | "uniqueExperienceBonus"
+      | "uniqueAttackBonus"
+      | "bossDamageBonus"
+      | "failureShardBonus"
+      | "uniqueSkillPowerBonus";
     value: number;
   };
 }
@@ -111,10 +152,26 @@ export interface SkillNode {
 export interface EnemyState {
   id: string;
   wave: number;
+  variantId: EnemyVariantId;
+  variantLabel: string;
+  variantTint: number;
+  variantTier: number;
+  trueBossId?: TrueBossId;
   hp: number;
   maxHp: number;
+  armor: number;
+  effects: EnemyStatusEffect[];
   progress: number;
   speed: number;
   rewardGold: number;
   isBoss: boolean;
+  lastHitByDefinitionId?: string;
+}
+
+export interface EnemyStatusEffect {
+  kind: "slow" | "freeze" | "poison";
+  remainingMs: number;
+  magnitude: number;
+  tickMs?: number;
+  sourceDefinitionId?: string;
 }

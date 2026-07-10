@@ -6,18 +6,52 @@ import { getUnitDefinition, getUnitsByRarity } from "./units";
 
 export { RARITIES, getRarity, getRarityIndex } from "./rarities";
 export { createRandomRng, createSeededRng } from "./rng";
-export { createDefaultMetaProgress, getSkillEffectTotal, purchaseSkill, skillTree } from "./skills";
+export { createDefaultMetaProgress, getSkillEffectTotal, purchaseSkill, skillTracks, skillTree } from "./skills";
 export type * from "./types";
-export { buildWaves } from "./waves";
+export { MAX_WAVES, buildWaves } from "./waves";
+
+export type SummonKind = "normal" | "advanced";
+
+const NORMAL_SUMMON_CHANCES: Partial<Record<RarityId, number>> = {
+  common: 0.459,
+  advanced: 0.255,
+  rare: 0.143,
+  epic: 0.082,
+  hero: 0.041,
+  legendary: 0.02,
+};
+
+const ADVANCED_SUMMON_CHANCES: Partial<Record<RarityId, number>> = {
+  common: 0.2,
+  advanced: 0.28,
+  rare: 0.22,
+  epic: 0.14,
+  hero: 0.08,
+  legendary: 0.045,
+  mythic: 0.025,
+  transcendent: 0.008,
+  immortal: 0.002,
+};
+
+const ADVANCED_UNIQUE_SUMMON_ENTRIES = [
+  { unitId: "mythic-ranger", chance: 0.025 },
+  { unitId: "mythic-plague-warlock", chance: 0.025 },
+  { unitId: "transcendent-time-mage", chance: 0.008 },
+  { unitId: "transcendent-frost-witch", chance: 0.008 },
+  { unitId: "immortal-berserker", chance: 0.0025 },
+] as const;
+
+export const ADVANCED_UNIQUE_BASE_CHANCE = ADVANCED_UNIQUE_SUMMON_ENTRIES.reduce((total, entry) => total + entry.chance, 0);
 
 export function createInitialRunState(meta: MetaProgress = createDefaultMetaProgress()): RunState {
+  const maxBaseHealth = 20 + getSkillEffectTotal(meta, "baseHealthBonus");
   return {
     wave: 0,
     waveTimeRemainingMs: 0,
     gold: 100 + getSkillEffectTotal(meta, "startGold"),
-    freeSummons: 0,
-    baseHealth: 20,
-    maxBaseHealth: 20,
+    freeSummons: getSkillEffectTotal(meta, "startFreeSummons"),
+    baseHealth: maxBaseHealth,
+    maxBaseHealth,
     board: [],
     activeBuffs: [],
     status: "ready",
@@ -28,23 +62,44 @@ export function createInitialRunState(meta: MetaProgress = createDefaultMetaProg
 
 export function createSummonSampler(rng: Rng): () => UnitDefinition {
   return () => {
-    const rarity = pickRarity(rng);
+    const rarity = pickRarity(rng, "normal");
     return rng.pick(getUnitsByRarity(rarity));
   };
 }
 
-export function pickRarity(rng: Rng): RarityId {
+export function pickRarity(rng: Pick<Rng, "next">, kind: SummonKind = "normal"): RarityId {
   const roll = rng.next();
   let cumulative = 0;
+  const chances = kind === "advanced" ? ADVANCED_SUMMON_CHANCES : NORMAL_SUMMON_CHANCES;
 
   for (const rarity of RARITIES) {
-    cumulative += rarity.summonChance;
+    cumulative += chances[rarity.id] ?? 0;
     if (roll <= cumulative) {
       return rarity.id;
     }
   }
 
-  return RARITIES[RARITIES.length - 1]!.id;
+  return kind === "advanced" ? RARITIES[RARITIES.length - 1]!.id : "legendary";
+}
+
+export function rollAdvancedUniqueUnit(rng: Pick<Rng, "next">, chanceBonus = 0): UnitDefinition | null {
+  const multiplier = 1 + Math.max(0, chanceBonus);
+  const roll = rng.next();
+  let cumulative = 0;
+
+  for (const entry of ADVANCED_UNIQUE_SUMMON_ENTRIES) {
+    cumulative += entry.chance * multiplier;
+    if (roll < cumulative) {
+      return getUnitDefinition(entry.unitId);
+    }
+  }
+  return null;
+}
+
+export function getFailureGrowthShards(wave: number, defeatedEnemies: number, bonus = 0): number {
+  const waveReward = 2 + Math.ceil(Math.max(1, wave) / 4);
+  const killReward = Math.floor(Math.max(0, defeatedEnemies) / 30);
+  return Math.max(3, Math.round((waveReward + killReward) * (1 + Math.max(0, bonus))));
 }
 
 export function createMergeCandidates(sourceUnitId: string, rng: Rng): UnitDefinition[] {

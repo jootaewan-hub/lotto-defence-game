@@ -8,7 +8,7 @@ import "./styles.css";
 
 const simulation = new GameSimulation(loadMetaProgress());
 const ui = createUi(simulation);
-const scene = new GameScene(simulation, ui.showEvents, ui.setSelectedSlot);
+const scene = new GameScene(simulation, ui.showEvents, ui.setSelectedSlot, ui.getSpeedMultiplier, ui.render);
 ui.setScene(scene);
 
 new Phaser.Game({
