@@ -14,7 +14,7 @@ ui.setScene(scene);
 new Phaser.Game({
   type: Phaser.AUTO,
   parent: "game-root",
-  backgroundColor: "#f7fbff",
+  backgroundColor: "#10242a",
   width: DESIGN_WIDTH,
   height: DESIGN_HEIGHT,
   scene,

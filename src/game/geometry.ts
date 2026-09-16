@@ -1,5 +1,5 @@
-export const DESIGN_WIDTH = 390;
-export const DESIGN_HEIGHT = 844;
+export const DESIGN_WIDTH = 780;
+export const DESIGN_HEIGHT = 500;
 
 export interface Point {
   x: number;

@@ -52,6 +52,10 @@ export type SimulationEvent =
   | { type: "jackpot"; reward: JackpotReward; text: string }
   | {
       type: "attack";
+      attackId: string;
+      sourceId: string;
+      unitLevel: number;
+      target: { id: string; isBoss: boolean; variantTier: number };
       from: { x: number; y: number };
       to: { x: number; y: number };
       critical: boolean;
@@ -60,7 +64,7 @@ export type SimulationEvent =
       role: UnitRole;
       ability?: UnitAbilityKind;
     }
-  | { type: "damage"; at: { x: number; y: number }; amount: number; critical: boolean; rarityTier: number }
+  | { type: "damage"; attackId?: string; targetId?: string; at: { x: number; y: number }; amount: number; critical: boolean; rarityTier: number }
   | { type: "goldReward"; at: { x: number; y: number }; amount: number; tier: GoldRewardTier }
   | {
       type: "unitExperience";
@@ -106,10 +110,36 @@ export class GameSimulation {
   state: RunState;
   meta: MetaProgress;
   pendingMerge: MergePrompt | null = null;
+  pendingReward = false;
+  expeditionAttackBonus = 0;
+  frostCooldownMs = 0;
+
+  get formationBonus(): number {
+    return new Set(this.state.board.map(unit => getUnitDefinition(unit.definitionId).role)).size === 3 ? 0.15 : 0;
+  }
+
+  castFrost(): boolean {
+    if (!this.currentWaveActive || this.frostCooldownMs > 0 || this.state.status !== 'running') return false;
+    this.frostCooldownMs = 24_000;
+    for (const enemy of this.enemies) enemy.effects.push({ kind: 'freeze', remainingMs: 3_000, magnitude: 1 });
+    this.events.push({ type: 'message', text: '달빛 결계 · 모든 적 3초 빙결' });
+    return true;
+  }
+
+  chooseReward(reward: 'power' | 'supply' | 'repair'): boolean {
+    if (!this.pendingReward || !['power', 'supply', 'repair'].includes(reward)) return false;
+    this.pendingReward = false;
+    if (reward === 'power') this.expeditionAttackBonus += 0.12;
+    if (reward === 'supply') this.state.gold += 60;
+    if (reward === 'repair') this.state.baseHealth = Math.min(this.state.maxBaseHealth, this.state.baseHealth + 5);
+    this.events.push({ type: 'message', text: reward === 'power' ? '달의 축복 · 이번 원정 공격력 +12%' : reward === 'supply' ? '왕국의 보급 · +60 골드' : '성채 복구 · 체력 +5' });
+    return true;
+  }
 
   private readonly rng: Rng;
   private readonly events: SimulationEvent[] = [];
   private enemySequence = 0;
+  private attackSequence = 0;
   private unitSequence = 0;
   private remainingSpawns = 0;
   private spawnTimerMs = 0;
@@ -134,7 +164,11 @@ export class GameSimulation {
     this.enemies.splice(0);
     this.events.splice(0);
     this.pendingMerge = null;
+    this.pendingReward = false;
+    this.expeditionAttackBonus = 0;
+    this.frostCooldownMs = 0;
     this.enemySequence = 0;
+    this.attackSequence = 0;
     this.unitSequence = 0;
     this.remainingSpawns = 0;
     this.spawnTimerMs = 0;
@@ -212,10 +246,12 @@ export class GameSimulation {
   }
 
   update(deltaMs: number): void {
+    if (deltaMs <= 0 || this.pendingReward || this.pendingMerge) return;
     if (this.state.status === "lost" || this.state.status === "won") {
       return;
     }
 
+    this.frostCooldownMs = Math.max(0, this.frostCooldownMs - deltaMs);
     if (this.tickNextWaveDelay(deltaMs)) {
       return;
     }
@@ -237,6 +273,11 @@ export class GameSimulation {
   }
 
   private summon(kind: SummonKind): boolean {
+    if (this.state.status === 'won' || this.state.status === 'lost' || this.pendingMerge || this.pendingReward) return false;
+    if (this.state.board.length >= 30) {
+      this.events.push({ type: 'message', text: '수호대 정원 30명 · 합성으로 자리를 확보하세요.' });
+      return false;
+    }
     if (kind === "normal" && this.state.freeSummons > 0) {
       this.state = { ...this.state, freeSummons: this.state.freeSummons - 1 };
     } else {
@@ -533,7 +574,7 @@ export class GameSimulation {
       return getUnitDefinition(unit.definitionId).role === "support" ? count + 1 : count;
     }, 0);
     const supportSpeedMultiplier = Math.min(1.25, 1 + supportCount * 0.025);
-    const attackBonus = 1 + getSkillEffectTotal(this.meta, "attackBonus");
+    const attackBonus = 1 + getSkillEffectTotal(this.meta, "attackBonus") + this.formationBonus + this.expeditionAttackBonus;
     const attackBuff = this.getBuffMultiplier("attack");
     const speedBuff =
       this.getBuffMultiplier("attackSpeed") *
@@ -585,8 +626,13 @@ export class GameSimulation {
 
       for (const target of targets) {
         const targetPosition = getPathPosition(target.progress);
+        const attackId = `attack-${++this.attackSequence}`;
         this.events.push({
           type: "attack",
+          attackId,
+          sourceId: unit.instanceId,
+          unitLevel: uniqueLevel,
+          target: { id: target.id, isBoss: target.isBoss, variantTier: target.variantTier },
           from: origin,
           to: targetPosition,
           critical,
@@ -607,7 +653,7 @@ export class GameSimulation {
               enemy.lastHitByDefinitionId = definition.id;
               enemy.hp -= areaDamage;
               applyUniqueAbility(enemy, definition, areaDamage, uniqueLevel, uniqueSkillPowerBonus, this.rng);
-              this.events.push({ type: "damage", at: position, amount: areaDamage, critical, rarityTier });
+              this.events.push({ type: "damage", attackId, targetId: enemy.id, at: position, amount: areaDamage, critical, rarityTier });
             }
           }
         } else {
@@ -616,7 +662,7 @@ export class GameSimulation {
           target.lastHitByDefinitionId = definition.id;
           target.hp -= reducedDamage;
           applyUniqueAbility(target, definition, reducedDamage, uniqueLevel, uniqueSkillPowerBonus, this.rng);
-          this.events.push({ type: "damage", at: targetPosition, amount: reducedDamage, critical, rarityTier });
+          this.events.push({ type: "damage", attackId, targetId: target.id, at: targetPosition, amount: reducedDamage, critical, rarityTier });
         }
       }
     });
@@ -800,6 +846,7 @@ export class GameSimulation {
     }
 
     this.nextWaveDelayMs = NEXT_WAVE_DELAY_MS;
+    this.pendingReward = completedWave % 3 === 0;
   }
 
   private tickNextWaveDelay(deltaMs: number): boolean {
