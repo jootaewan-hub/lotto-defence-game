@@ -1,6 +1,6 @@
 import type { WaveDefinition } from "./types";
 
-export const MAX_WAVES = 60;
+export const MAX_WAVES = 120;
 
 export function buildWaves(): WaveDefinition[] {
   return Array.from({ length: MAX_WAVES }, (_, index) => {

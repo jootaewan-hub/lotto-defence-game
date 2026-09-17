@@ -10,6 +10,9 @@ export type RarityId =
   | "immortal";
 
 export type UnitRole = "single" | "area" | "support";
+export type TowerType = 'archer' | 'warrior' | 'mage' | 'priest';
+export type DragonItemKind = 'weapon' | 'ring' | 'boots';
+export interface DragonItem { kind: DragonItemKind; level: number; bonus: number; waveSpeedPercent?: number }
 
 export type UnitAbilityKind = "multishot" | "slow" | "poison" | "freeze" | "berserk";
 
@@ -28,6 +31,8 @@ export interface Rarity {
 }
 
 export interface UnitDefinition {
+  towerType?: TowerType;
+  superUnique?: boolean;
   id: string;
   name: string;
   rarity: RarityId;
@@ -59,6 +64,13 @@ export interface ActiveBuff {
 }
 
 export interface UnitInstance {
+  speedUpgradePercent?: number;
+  superElapsedMs?: number;
+  superStarted?: boolean;
+  items?: DragonItem[];
+  attackUpgradePercent?: number;
+  upgradeCount?: number;
+  upgradeGoldSpent?: number;
   instanceId: string;
   definitionId: string;
   cooldownMs: number;

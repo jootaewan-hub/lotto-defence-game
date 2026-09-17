@@ -1,4 +1,3 @@
-
 @import url('https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Noto+Sans+KR:wght@400;500;600;700&display=swap');
 :root {
   font-family: 'Noto Sans KR',sans-serif;
@@ -11,6 +10,7 @@
   --mint: #9cd4bd;
   --line: #ffffff12;
   --panel: #142127
+
 }
 * {
   box-sizing: border-box
@@ -1515,8 +1515,708 @@ dialog h2 {
     height: 38px
   }
 }
-.speed-button.operator-speed { color: #d7adbf; display: inline-flex; align-items: center; gap: 4px; }
-.speed-button.operator-speed small { font-size: 8px; line-height: 1; border: 1px solid #d7adbf44; padding: 3px; border-radius: 3px; }
-.speed-button.operator-speed.active { background: #9d527332; color: #f0c0d2; }
-@media(max-width:1100px) and (min-width:801px) { .battle-toolbar { flex-wrap: wrap; height: auto; min-height: 62px; } .speed-controls { flex: 1 0 100%; } }
-@media(max-width:450px) { .battle-toolbar { flex-wrap: wrap; height: auto; min-height: 86px; justify-content: space-between; } .speed-controls { flex: 1 0 100%; justify-content: center; gap: 5px; } .kill-count { margin-left: 8px; } .wave-button { margin-left: auto; } .speed-button { padding: 7px 10px; } }
+.speed-button.operator-speed {
+  color: #d7adbf;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.speed-button.operator-speed small {
+  font-size: 8px;
+  line-height: 1;
+  border: 1px solid #d7adbf44;
+  padding: 3px;
+  border-radius: 3px;
+}
+.speed-button.operator-speed.active {
+  background: #9d527332;
+  color: #f0c0d2;
+}
+@media(max-width:1100px) and (min-width:801px) {
+  .battle-toolbar {
+    flex-wrap: wrap;
+    height: auto;
+    min-height: 62px;
+  }
+  .speed-controls {
+    flex: 1 0 100%;
+  }
+}
+@media(max-width:450px) {
+  .battle-toolbar {
+    flex-wrap: wrap;
+    height: auto;
+    min-height: 86px;
+    justify-content: space-between;
+  }
+  .speed-controls {
+    flex: 1 0 100%;
+    justify-content: center;
+    gap: 5px;
+  }
+  .kill-count {
+    margin-left: 8px;
+  }
+  .wave-button {
+    margin-left: auto;
+  }
+  .speed-button {
+    padding: 7px 10px;
+  }
+}
+.forge-button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 12px 10px;
+  background: linear-gradient(110deg,#bca57925,#dbc88d0d);
+  border: 1px solid #d7be8555;
+  border-radius: 5px;
+  color: #e1cfa0;
+  font-size: 10px
+}
+.forge-button svg {
+  width: 15px;
+  height: 15px;
+  margin-right: 4px
+}
+.forge-button b {
+  font-size: 11px;
+  white-space: nowrap
+}
+.upgrade-hint {
+  font-size: 9px;
+  color: #92aaa0;
+  text-align: center;
+  margin: 8px 0 13px;
+  line-height: 1.7
+}
+.blessings-button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 13px 0;
+  margin-top: 16px;
+  border: 0;
+  border-top: 1px solid var(--line);
+  color: #a5d4c0;
+  font-size: 11px
+}
+.blessings-button svg {
+  width: 16px;
+  height: 16px;
+  margin-right: 6px
+}
+.blessings-button b {
+  font-weight: 400;
+  font-size: 10px
+}
+.blessings-button+.growth-button {
+  margin-top: 0
+}
+.reward-current {
+  font-size: 10px;
+  color: #a9beb4;
+  margin-top: 15px
+}
+.roll-cta {
+  font-size: 10px;
+  color: #e1c58e;
+  border-top: 1px solid #d2bb7d33;
+  margin-top: 14px;
+  padding-top: 12px;
+  width: 100%
+}
+.choice strong {
+  line-height: 1.7
+}
+.dice-stage {
+  text-align: center;
+  padding: 18px 0 10px
+}
+.dice-orbit {
+  width: 230px;
+  height: 235px;
+  display: grid;
+  place-items: center;
+  margin: auto;
+  position: relative;
+  perspective: 650px;
+  background: radial-gradient(ellipse at center,#d9c89114,transparent 65%)
+}
+.dice-orbit:after {
+  content: '';
+  position: absolute;
+  bottom: 1px;
+  width: 145px;
+  height: 17px;
+  border-radius: 50%;
+  background: #0008;
+  filter: blur(9px);
+  z-index: -1
+}
+.d20-die {
+  position: relative;
+  width: 160px;
+  height: 178px;
+  transform-style: preserve-3d;
+  filter: drop-shadow(0 10px 18px #0006)
+}
+.d20-die>svg {
+  width: 100%;
+  height: 100%
+}
+.dice-value {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 63px;
+  color: #f6e4b7;
+  font: 700 37px Georgia,serif;
+  text-shadow: 0 0 18px #e3ce7355
+}
+.d20-die.is-rolling {
+  animation: dice-tumble .43s ease-in-out infinite
+}
+.d20-die.is-revealed {
+  animation: dice-land .5s ease-out
+}
+.dice-result {
+  min-height: 76px;
+  padding-top: 5px
+}
+.dice-result small {
+  display: block;
+  font-size: 11px;
+  color: #9db9aa;
+  margin-bottom: 12px
+}
+.dice-result strong {
+  font: 700 22px 'Gowun Batang',serif;
+  color: #dee5dc
+}
+.dice-result b {
+  color: #f4d398;
+  white-space: nowrap
+}
+.dice-distribution {
+  max-width: 360px;
+  margin: 9px auto 12px
+}
+.dice-bars {
+  display: flex;
+  gap: 4px;
+  align-items: end;
+  height: 48px;
+  padding: 0 8px;
+  border-bottom: 1px solid #b5c79e33
+}
+.dice-bars i {
+  flex: 1;
+  height: var(--bar);
+  background: #6da69255;
+  border-radius: 3px 3px 0 0;
+  min-height: 2px
+}
+.dice-bars i.rolled-face {
+  background: #e0c585;
+  box-shadow: 0 0 12px #ddc56b44
+}
+.dice-distribution>div:last-child {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9px;
+  color: #89a398;
+  padding-top: 8px
+}
+.dice-footnote {
+  font-size: 10px;
+  line-height: 1.8;
+  color: #879f96;
+  text-align: center;
+  margin: 14px 0
+}
+.blessing-list {
+  display: grid;
+  gap: 9px;
+  margin-top: 24px;
+  max-height: 50dvh;
+  overflow-y: auto
+}
+.blessing-list article {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #a9c1a423;
+  border-radius: 5px;
+  background: #091a2244
+}
+.blessing-list article>span {
+  color: #b5cda4
+}
+.blessing-list b {
+  font-size: 12px
+}
+.blessing-list small {
+  display: block;
+  font-size: 9px;
+  line-height: 1.7;
+  color: #92aca2;
+  margin-top: 5px
+}
+.blessing-list strong {
+  font-size: 13px;
+  color: var(--gold);
+  margin-left: auto;
+  white-space: nowrap
+}
+.choice p {
+  flex: 1
+}
+.unit-card b {
+  overflow-wrap: anywhere
+}
+@keyframes dice-tumble {
+  0% {
+    transform: translateY(-12px) rotateX(18deg) rotateY(-28deg) rotateZ(-16deg)
+  }
+  25% {
+    transform: translateY(-27px) rotateX(-24deg) rotateY(24deg) rotateZ(13deg)
+  }
+  50% {
+    transform: translateY(-8px) rotateX(28deg) rotateY(36deg) rotateZ(25deg)
+  }
+  75% {
+    transform: translateY(-23px) rotateX(-16deg) rotateY(-20deg) rotateZ(-5deg)
+  }
+  100% {
+    transform: translateY(-12px) rotateX(18deg) rotateY(-28deg) rotateZ(-16deg)
+  }
+}
+@keyframes dice-land {
+  0% {
+    transform: translateY(-20px) scale(1.12);
+    filter: drop-shadow(0 0 30px #f5d88988)
+  }
+  50% {
+    transform: translateY(4px) scale(.96)
+  }
+  100% {
+    transform: translateY(0) scale(1)
+  }
+}
+@media(max-width:800px) {
+  .command-panel {
+    display: block
+  }
+  .command-panel .selected-unit {
+    padding: 18px 0 12px;
+    margin-top: 17px;
+    border-top: 1px solid var(--line)
+  }
+  .command-panel .unit-actions {
+    display: grid
+  }
+  .forge-button {
+    font-size: 12px;
+    padding: 14px
+  }
+  .synergies>div {
+    justify-content: center;
+    gap: 10px
+  }
+  .synergies b {
+    margin-left: 8px
+  }
+  .selected-unit h3 {
+    font-size: 13px
+  }
+  .selected-unit p {
+    font-size: 10px
+  }
+  .selected-unit>img {
+    width: 60px;
+    height: 66px
+  }
+}
+@media(max-width:450px) {
+  .dice-orbit {
+    height: 200px;
+    width: 200px
+  }
+  .d20-die {
+    width: 140px;
+    height: 156px
+  }
+  .dice-value {
+    top: 55px;
+    font-size: 32px
+  }
+  .dice-result strong {
+    font-size: 19px
+  }
+  .blessing-list article {
+    padding: 10px;
+    gap: 8px
+  }
+  .dice-distribution>div:last-child {
+    font-size: 8px
+  }
+}
+@media(prefers-reduced-motion:reduce) {
+  .d20-die.is-rolling,.d20-die.is-revealed {
+    animation: none
+  }
+}
+.roulette-stage {
+  position: relative;
+  width: 230px;
+  height: 240px;
+  margin: 25px auto 12px;
+  display: grid;
+  place-items: center
+}
+.roulette-wheel {
+  width: 220px;
+  height: 220px;
+  filter: drop-shadow(0 8px 20px #0008);
+  transform-origin: center
+}
+.roulette-pointer {
+  position: absolute;
+  top: 0;
+  left: calc(50% - 9px);
+  width: 0;
+  height: 0;
+  border-left: 9px solid transparent;
+  border-right: 9px solid transparent;
+  border-top: 24px solid #ffe2a4;
+  z-index: 2;
+  filter: drop-shadow(0 2px 4px #0009)
+}
+.roulette-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  pointer-events: none;
+  color: #b9cbb9;
+  font: 10px Georgia;
+  letter-spacing: 1px;
+  line-height: 1.9
+}
+.roulette-center b {
+  font: 700 17px Georgia;
+  color: var(--gold);
+  letter-spacing: 0
+}
+.speed-forge {
+  margin-top: 7px;
+  color: #a6d9da;
+  background: #91cdca0b;
+  border-color: #91cdca35
+}
+.stat-gain {
+  font-style: normal;
+  color: #b9e7b5;
+  font-weight: 700
+}
+.super-access {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+  margin-top: 18px
+}
+.super-access button {
+  padding: 11px 5px;
+  font-size: 10px;
+  color: #e1c394;
+  border-color: #b6966844;
+  border-radius: 5px;
+  background: #cfb3780c
+}
+.super-access svg {
+  width: 14px;
+  height: 14px;
+  margin-right: 3px
+}
+.synergies {
+  grid-template-columns: repeat(4,1fr);
+  gap: 4px
+}
+.synergies>div {
+  gap: 2px;
+  padding: 8px 3px;
+  font-size: 9px
+}
+.synergies img {
+  width: 17px;
+  height: 23px
+}
+.synergies b {
+  font-size: 9px
+}
+.unit-card.super-card {
+  border-color: #e6c99288;
+  background: radial-gradient(ellipse at 50% 35%,#d8b77a33,transparent 65%),#263035;
+  box-shadow: inset 0 0 20px #e2c8880b
+}
+.super-card .unit-rarity {
+  color: #eed199
+}
+.super-card img {
+  filter: drop-shadow(0 0 9px #dcc78899)
+}
+.super-forge-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 13px;
+  margin-top: 23px
+}
+.super-forge-card {
+  padding: 18px;
+  border: 1px solid #d1b78555;
+  border-radius: 8px;
+  background: radial-gradient(circle at 50% 15%,#d3bc7920,transparent 60%),#0a1a2344;
+  text-align: center
+}
+.super-forge-card>img {
+  width: 78px;
+  height: 86px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 12px #e0c98b55)
+}
+.super-forge-card>span {
+  display: block;
+  font-size: 9px;
+  color: #d5bd88;
+  margin: 10px 0 7px
+}
+.super-forge-card h3 {
+  font: 700 18px 'Gowun Batang',serif;
+  margin: 8px 0 13px;
+  color: #e6d6b1
+}
+.super-forge-card p {
+  font-size: 10px;
+  line-height: 1.8;
+  color: #9fb4ab;
+  margin: 8px 0
+}
+.recipe-counts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+  margin: 15px 0
+}
+.recipe-counts span {
+  padding: 5px;
+  font-size: 9px;
+  color: #987e7a;
+  border: 1px solid #bc918527;
+  border-radius: 3px
+}
+.recipe-counts .enough {
+  color: #a7d8bc;
+  border-color: #9ccaaf44
+}
+.super-forge-card>button {
+  width: 100%;
+  padding: 10px;
+  font-size: 11px;
+  border-radius: 5px;
+  background: #c4ac7822;
+  color: #e5cea0
+}
+.super-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 21px 0
+}
+.super-picker button {
+  padding: 8px;
+  font-size: 10px;
+  border-radius: 4px
+}
+.super-picker .active {
+  color: var(--gold);
+  border-color: var(--gold)
+}
+.inventory-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  margin: 15px 0
+}
+.inventory-heading span {
+  font-size: 10px;
+  color: var(--muted)
+}
+.inventory-slots {
+  display: grid;
+  grid-template-columns: repeat(3,1fr);
+  gap: 9px;
+  margin-bottom: 20px
+}
+.inventory-slots>div {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 9px;
+  padding: 16px 5px;
+  border: 1px dashed #92b59c44;
+  border-radius: 6px;
+  color: #6d877c
+}
+.inventory-slots .equipped {
+  border-style: solid;
+  border-color: #cfb88d88;
+  color: #e6cfa1;
+  background: #c8b2790d
+}
+.inventory-slots span {
+  font-size: 22px
+}
+.inventory-slots b {
+  font-size: 10px;
+  font-weight: 500
+}
+.dragon-items {
+  display: grid;
+  gap: 12px
+}
+.dragon-items article {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 15px;
+  border: 1px solid #d1b98b33;
+  border-radius: 6px;
+  background: #0b1b2355
+}
+.dragon-items article>div {
+  flex: 1
+}
+.dragon-items h3 {
+  font-size: 13px;
+  color: #e1cca0;
+  margin-bottom: 9px
+}
+.dragon-items p {
+  font-size: 10px;
+  line-height: 1.8;
+  color: #90aa9d
+}
+.dragon-items strong {
+  display: block;
+  font-size: 11px;
+  color: #a6d6ba;
+  margin-top: 10px;
+  line-height: 1.7
+}
+.dragon-items small {
+  display: block;
+  font-size: 9px;
+  color: #b1b58e;
+  margin-top: 8px;
+  line-height: 1.6
+}
+.dragon-items button {
+  padding: 10px;
+  font-size: 10px;
+  white-space: nowrap;
+  border-radius: 4px;
+  color: #dec698
+}
+.shop-result {
+  padding: 12px;
+  margin: 12px 0;
+  color: #e5d29f;
+  background: #cfb17312;
+  border: 1px solid #cfb17344;
+  font-size: 12px;
+  border-radius: 5px
+}
+.command-panel .growth-button {
+  padding-top: 12px
+}
+.command-panel .section-title {
+  margin-top: 18px
+}
+.command-panel .selected-unit {
+  min-height: 111px;
+  margin-top: 14px
+}
+.super-card {
+  flex-basis: 110px
+}
+.unit-card small {
+  line-height: 1.8
+}
+.super-access button:disabled {
+  opacity: .3
+}
+@media(min-width:1000px) {
+  .battle-column {
+    position: sticky;
+    top: 12px
+  }
+}
+@media(max-width:600px) {
+  .super-forge-grid {
+    grid-template-columns: 1fr
+  }
+  .super-forge-card {
+    padding: 15px
+  }
+  .dragon-items article {
+    display: block
+  }
+  .dragon-items button {
+    width: 100%;
+    margin-top: 14px
+  }
+  .inventory-slots {
+    gap: 5px
+  }
+  .inventory-slots b {
+    font-size: 8px
+  }
+  .roulette-stage {
+    width: 205px;
+    height: 215px
+  }
+  .roulette-wheel {
+    width: 200px;
+    height: 200px
+  }
+  .synergies>div {
+    justify-content: center;
+    font-size: 10px;
+    gap: 5px
+  }
+  .synergies b {
+    margin-left: 3px
+  }
+}
+.card-attack {
+  font-size: 8px!important;
+  white-space: nowrap;
+  letter-spacing: -.2px
+}
+.card-attack em {
+  font-style: normal;
+  color: #add3a4
+}
+.roulette-stage+.dice-result {
+  padding-bottom: 10px
+}

@@ -117,7 +117,7 @@ export function createMergeCandidates(sourceUnitId: string, rng: Rng): UnitDefin
     [candidates[index], candidates[swapIndex]] = [candidates[swapIndex]!, candidates[index]!];
   }
 
-  return candidates;
+  return candidates.slice(0, 3);
 }
 
 export function resolveJackpotReward(state: RunState, reward: JackpotReward): RunState {

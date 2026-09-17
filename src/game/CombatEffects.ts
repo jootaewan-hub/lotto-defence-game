@@ -38,6 +38,7 @@ export class CombatEffects {
     private graphics: Phaser.GameObjects.Graphics;
     private flights: Flight[] = [];
     private impacts: Impact[] = [];
+    private bursts: {event:Extract<SimulationEvent,{type:'superSkill'}>;age:number}[] = [];
     private poses = new Map<string, Pose>();
     private targets = new Map<string, Target>();
     private flashes = new Map<string, number>();
@@ -56,9 +57,12 @@ export class CombatEffects {
                 damageByHit.set(`${event.attackId}:${event.targetId}`, event.amount);
         }
         for (const event of events) {
+            if(event.type==='superSkill'){if(this.bursts.length>=12)this.bursts.shift();this.bursts.push({event,age:0});continue;}
             if (event.type !== 'attack')
                 continue;
-            const style = getCombatStyle(event.role, event.ability, event.rarityTier, event.unitLevel);
+            const ability=event.superType==='archer'?'multishot':event.ability;
+            const style = getCombatStyle(event.role, ability, event.rarityTier, event.unitLevel);
+            if(event.superType){style.intensity+=3;style.radius+=3;style.sparks=Math.min(24,style.sparks+6);}
             const start = project(event.from), end = project(event.to);
             const angle = Math.atan2(end.y - start.y, end.x - start.x);
             // Origin follows the weapon side; the unit's foot position never changes.
@@ -121,6 +125,8 @@ export class CombatEffects {
                 surviving.push(flight);
         }
         this.flights = surviving;
+        for(const burst of this.bursts){burst.age+=dt;this.drawSuperBurst(burst.event,burst.age);}
+        this.bursts=this.bursts.filter(b=>b.age<850);
         for (const impact of this.impacts) {
             impact.age += dt;
             this.drawImpact(impact);
@@ -159,6 +165,7 @@ export class CombatEffects {
     }
     clear() {
         this.flights = [];
+        this.bursts = [];
         this.impacts = [];
         this.poses.clear();
         this.targets.clear();
@@ -166,6 +173,21 @@ export class CombatEffects {
         this.labels.forEach(l => l.text.destroy());
         this.labels = [];
         this.graphics.clear();
+    }
+    private drawSuperBurst(event:Extract<SimulationEvent,{type:'superSkill'}>,age:number){
+        const t=Math.min(1,age/850),alpha=1-t,g=this.graphics;
+        const color=event.skill==='blessing'?0xc6acff:event.skill==='inferno'?0xff8454:event.skill==='dragon-ring'||event.skill==='dragon-magic'?0xffda78:0xffb5a0;
+        const p=project(event.at),global=event.skill==='inferno'||event.skill==='dragon-ring';
+        const center=global?{x:390,y:245}:p,radius=(global?330:80)*Math.sqrt(t);
+        g.fillStyle(color,alpha*(global?0.035:0.07));g.fillCircle(center.x,center.y,radius);
+        g.lineStyle(global?3:2,color,alpha*0.7);g.strokeCircle(center.x,center.y,radius);
+        g.lineStyle(1,0xfff0ca,alpha*0.55);g.strokeCircle(center.x,center.y,radius*.8);
+        for(let k=0;k<8;k++){const angle=k*Math.PI/4+(this.reduced?0:t);const x=center.x+Math.cos(angle)*radius,y=center.y+Math.sin(angle)*radius;this.star({x,y},(global?14:7)*alpha,color,alpha,angle);}
+        for(const target of (event.targets??[]).slice(0,24)){
+            const end=project(target);
+            if(event.skill==='blessing'){g.lineStyle(1.5,color,alpha*.5);g.lineBetween(p.x,p.y,end.x,end.y);g.lineStyle(2,color,alpha);g.strokeEllipse(end.x,end.y+14,40+20*t,18+10*t);}
+            else {g.lineStyle(3,color,alpha);g.lineBetween(end.x,end.y-65*alpha,end.x,end.y);this.star(end,12*alpha,0xffe5a7,alpha,t);}
+        }
     }
     private impact(flight: Flight, at: Point) {
         if (this.impacts.length >= 100)
@@ -205,6 +227,9 @@ export class CombatEffects {
                 g.fillStyle(s.core, 0.65);
                 g.fillCircle(p.x + Math.cos(a) * spread, p.y + Math.sin(a) * spread, 1 + s.intensity * 0.12);
             }
+        }
+        if(f.event.superType&&!this.reduced){
+            for(const sign of [-1,1]){g.lineStyle(1.4,s.core,0.75);g.beginPath();for(let j=0;j<7;j++){const back=j*7,wave=Math.sin(f.age*.025-j*.7)*sign*(6+s.intensity);const x=p.x-dx*back+nx*wave,y=p.y-dy*back+ny*wave;if(j===0)g.moveTo(x,y);else g.lineTo(x,y);}g.strokePath();}
         }
         switch (s.kind) {
             case 'blade':

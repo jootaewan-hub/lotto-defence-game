@@ -153,7 +153,7 @@ describe("lotto defence game systems", () => {
     expect(simulation.getMergeableGroups()).toEqual([[0, 1, 2]]);
   });
 
-  test("waves contain 60 rounds with bosses every fifth wave and true bosses every tenth", () => {
+  test("waves contain 120 rounds with bosses every fifth wave and true bosses every tenth", () => {
     const waves = buildWaves();
 
     expect(waves).toHaveLength(MAX_WAVES);
@@ -167,6 +167,7 @@ describe("lotto defence game systems", () => {
       [40, "undead-demon-king"],
       [50, "orc-emperor"],
       [60, "ogre-king"],
+      [70, "ancient-dragon"], [80, "undead-demon-king"], [90, "orc-emperor"], [100, "ogre-king"], [110, "ancient-dragon"], [120, "undead-demon-king"],
     ]);
   });
 

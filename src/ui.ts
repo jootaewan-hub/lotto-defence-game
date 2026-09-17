@@ -1,9 +1,14 @@
+import { superForgeMarkup, dragonShopMarkup } from './superUi';
+import { MAX_TOWERS, TOWER_TYPES, TOWER_LABELS } from './game/superUnits';
+import type { TowerType, DragonItemKind } from './game/types';
+import { animateDice, diceMarkup } from './dice';
+import { REWARD_POOL, type UpgradeRoll } from './game/upgrades';
 import type { GameScene } from './game/GameScene';
 import type { GameSimulation, SimulationEvent } from './game/simulation';
 import { getRarity } from './game/rarities';
 import { MAX_WAVES, purchaseSkill, skillTracks, skillTree } from './game/systems';
 import { saveMetaProgress } from './game/storage';
-import { getEffectiveUnitStats, getUniqueUnitLevel, getUnitDefinition } from './game/units';
+import { getUniqueUnitLevel, getUnitDefinition, getUnitPortrait, getTowerType, isUniqueUnit } from './game/units';
 export interface UiHandle {
     setScene(scene: GameScene): void;
     render(): void;
@@ -16,7 +21,7 @@ const icon = (name: string) => {
     const paths: Record<string, string> = { moon: 'M20 15.2A8.7 8.7 0 0 1 8.8 4a8.7 8.7 0 1 0 11.2 11.2Z', shield: 'M12 3 4 6v6c0 5 8 9 8 9s8-4 8-9V6Z', diamond: 'm12 3 8 9-8 9-8-9Z', swords: 'm4 3 16 17m0-17L4 20M3 15l6 6m6-18 6 6', snow: 'M12 2v20M3.3 7l17.4 10M3.3 17 20.7 7M9 4l3 3 3-3M9 20l3-3 3 3', star: 'm12 2 2.5 7.5L22 12l-7.5 2.5L12 22l-2.5-7.5L2 12l7.5-2.5Z', play: 'm8 4 12 8-12 8Z', pause: 'M8 5v14M16 5v14', sound: 'm4 9 4 0 5-4v14l-5-4H4ZM17 8c3 2 3 6 0 8', book: 'M12 5C8 2 3 4 3 4v15s5-2 9 1c4-3 9-1 9-1V4s-5-2-9 1Zm0 0v15', coin: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Zm0 4v10m-3-8h5c3 0 3 3 0 3h-4c-3 0-3 3 0 3h5' };
     return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${(paths[name] || paths.star).split('~').map(d => `<path d="${d}"/>`).join('')}</svg>`;
 };
-function portrait(id: string) { const d = getUnitDefinition(id); return d.uniqueAbility ? ({ 'multishot': 'storm-archer', 'poison': 'plague-warlock', 'slow': 'time-mage', 'freeze': 'frost-witch', 'berserk': 'berserker' }[d.uniqueAbility]) : d.role === 'single' ? 'knight' : d.role === 'area' ? 'wizard' : 'priest'; }
+function portrait(id: string) { return getUnitPortrait(getUnitDefinition(id)); }
 export function createUi(sim: GameSimulation): UiHandle {
     const app = document.querySelector<HTMLDivElement>('#app')!;
     app.innerHTML = `<main class="shell">
@@ -26,16 +31,16 @@ export function createUi(sim: GameSimulation): UiHandle {
    <div class="battle-column"><div class="battle-hud"><div class="wave-stat"><span class="stat-label">현재 웨이브</span><strong><span id="wave-count">00</span><small> / ${MAX_WAVES}</small></strong></div><div class="health-stat"><div><span>${icon('shield')} 성채 내구도</span><b id="hp-count"></b></div><div class="health-track"><i id="hp-bar"></i></div></div><div class="gold-stat">${icon('coin')}<div><span class="stat-label">보유 골드</span><strong id="gold-count"></strong></div></div></div>
     <div class="arena-wrap"><div id="game-root"></div><div class="arena-topline"><span id="phase-chip" class="phase-chip"></span><span id="timer-chip"></span></div><div class="arena-caption"><span class="live-dot"></span> 달빛의 정원 <small>방어 구역</small></div><div id="toast" class="toast" role="status" aria-live="polite"></div><div id="pause-overlay" class="pause-overlay hidden"><span>${icon('pause')}</span><h2>잠시, 숨 고르기</h2><p>계속하려면 일시정지 버튼 또는 Space</p></div></div>
     <div class="battle-toolbar"><div class="speed-controls"><button id="pause-button" class="icon-button" aria-label="일시정지">${icon('pause')}</button><span class="divider"></span>${[1, 2, 3, 5, 10].map(s => `<button data-speed="${s}" class="speed-button ${s === 1 ? 'active' : ''} ${s === 10 ? 'operator-speed' : ''}" aria-label="${s}배속${s === 10 ? ' 운영자용' : ''}" title="${s === 10 ? '운영자용 고속 테스트' : `${s}배속`}">${s}×${s === 10 ? '<small>운영자</small>' : ''}</button>`).join('')}</div><span class="kill-count">처치 <b id="kill-count">0</b></span><button id="wave-button" class="wave-button">${icon('play')} 원정 시작</button></div>
-    <div class="journey-strip"><span>원정의 이정표</span><div id="milestones">${[1, 10, 20, 30, 40, 50, 60].map(n => `<span data-milestone="${n}"><i>${n === 1 ? '·' : icon('diamond')}</i><small>${n}</small></span>`).join('')}</div><b>60<br><small>최종 방어</small></b></div>
+    <div class="journey-strip"><span>원정의 이정표</span><div id="milestones">${[1, 20, 40, 60, 80, 100, 120].map(n => `<span data-milestone="${n}"><i>${n === 1 ? '·' : icon('diamond')}</i><small>${n}</small></span>`).join('')}</div><b>${MAX_WAVES}<br><small>최종 방어</small></b></div>
    </div>
-   <aside class="command-panel"><div class="panel-heading"><h2>수호대 편성</h2><span id="unit-count">0 / 30</span></div>
+   <aside class="command-panel"><div class="panel-heading"><h2>수호대 편성</h2><span id="unit-count">0 / ${MAX_TOWERS}</span></div>
     <p class="panel-description">소환은 운으로, 승리는 전략으로.</p>
     <div class="summon-actions"><button id="summon-button" class="summon-button"><span class="summon-symbol">${icon('star')}</span><span><b>수호자 소환</b><small>일반 ~ 전설 등급</small></span><span class="summon-price" id="summon-price"></span><kbd>Q</kbd></button><button id="advanced-summon-button" class="advanced-button"><span>${icon('diamond')} 고급 소환</span><b id="advanced-price"></b><kbd>W</kbd></button></div>
     <div class="section-title"><h3>편성 시너지</h3><span id="synergy-status"></span></div><div id="synergies" class="synergies"></div><p class="synergy-caption">세 역할을 모두 편성하면 공격력 +15%</p>
     <div class="selected-unit" id="selected-unit"></div>
-    <div class="unit-actions"><button id="merge-button">${icon('diamond')} 선택 합성</button><button id="sell-button">판매</button></div>
+    <button id="upgrade-button" class="forge-button"><span>${icon('swords')} 공격력 룰렛 강화</span><b id="upgrade-price"></b></button><button id="speed-upgrade-button" class="forge-button speed-forge"><span>${icon('star')} 공격속도 주사위</span><b id="speed-upgrade-price"></b></button><p id="upgrade-hint" class="upgrade-hint"></p><div class="unit-actions"><button id="merge-button">${icon('diamond')} 선택 합성</button><button id="sell-button">판매</button></div>
     <div class="section-title"><h3>전술 스킬</h3><span>직접 사용</span></div><button id="frost-button" class="frost-button"><span class="frost-icon">${icon('snow')}</span><span><b>달빛 결계</b><small>모든 적을 3초간 빙결</small></span><span id="frost-status">준비</span><kbd>E</kbd></button>
-    <button id="skill-toggle" class="growth-button"><span>${icon('moon')} 영구 성장</span><span id="shard-count"></span></button>
+    <div class="super-access"><button id="super-forge-button">${icon('diamond')} 슈퍼유니크 각성</button><button id="dragon-shop-button">${icon('swords')} 드래곤 상점</button></div><button id="blessings-button" class="blessings-button"><span>${icon('book')} 원정 축복</span><b id="blessings-count">0개</b></button><button id="skill-toggle" class="growth-button"><span>${icon('moon')} 영구 성장</span><span id="shard-count"></span></button>
    </aside>
   </section>
   <section class="roster-panel"><div class="roster-heading"><div><h2>나의 수호자</h2><span id="roster-hint">같은 수호자 3명을 모아 상위 등급으로 합성하세요.</span></div><div class="roster-tools"><button id="sort-button" class="quiet-button">자동 배치</button><button id="bulk-merge-button" class="quiet-button">일괄 합성 <span id="merge-count">0</span></button></div></div><div id="roster" class="roster"></div></section>
@@ -43,6 +48,9 @@ export function createUi(sim: GameSimulation): UiHandle {
  </main><dialog id="game-dialog" aria-labelledby="dialog-title"><div id="dialog-content"></div></dialog>`;
     let scene: GameScene | null = null, selected: number | null = null, speed = 1, paused = false, muted = true, dialogKind = '', rosterKey = '', saved = JSON.stringify(sim.meta), toastTimer = 0;
     let audio: AudioContext | undefined;
+    let stopDice: (() => void) | undefined;
+    let autoCloseTimer: number | undefined;
+    let shopSlot: number | null = null;
     const q = <T extends HTMLElement = HTMLElement>(id: string) => document.querySelector<T>(`#${id}`)!;
     const dialog = q<HTMLDialogElement>('game-dialog');
     const button = (id: string, fn: () => void) => q(id).addEventListener('click', () => { fn(); tone(); flush(); render(); });
@@ -62,9 +70,9 @@ export function createUi(sim: GameSimulation): UiHandle {
         o.stop(audio.currentTime + 0.21);
     }
     catch { /* Audio is optional. */ } }
-    function open(kind: string, html: string) { dialogKind = kind; q('dialog-content').innerHTML = html; if (!dialog.open)
+    function open(kind: string, html: string) { dialogKind = kind; q('dialog-content').innerHTML = html; dialog.scrollTop = 0; if (!dialog.open)
         dialog.showModal(); }
-    function close() { dialog.close(); dialogKind = ''; }
+    function close() { window.clearTimeout(autoCloseTimer); stopDice?.(); stopDice = undefined; dialog.close(); dialogKind = ''; }
     function heading(label: string, title: string, desc: string) { return `<span class="dialog-eyebrow">${label}</span><h2 id="dialog-title">${title}</h2><p class="dialog-description">${desc}</p>`; }
     function toast(text: string) { q('toast').textContent = text; q('toast').classList.add('show'); window.clearTimeout(toastTimer); toastTimer = window.setTimeout(() => q('toast').classList.remove('show'), 2600); }
     function starter() { for (let i = 0; i < 3; i++)
@@ -72,6 +80,25 @@ export function createUi(sim: GameSimulation): UiHandle {
     starter();
     button('summon-button', () => sim.summonToFirstEmpty());
     button('advanced-summon-button', () => sim.summonAdvanced());
+    function showDice(roll: UpgradeRoll) {
+        stopDice?.();
+        const tower=roll.kind==='tower';
+        open('dice', heading(tower?`강화 비용 ${roll.cost}G 결제 완료`:`${sim.state.wave}웨이브 축복`, tower?(roll.stat==='attack'?'공격력 강화 룰렛':'공격속도 강화 주사위'):'이번 원정의 운명을 굴립니다', `${roll.label} +${roll.min}~${roll.max}${roll.unit} · 결과는 한 번만 확정됩니다.`) + diceMarkup(roll) + `<p class="dice-footnote">${tower?'약 0.65초 후 자동 적용 · 합성 시 계승':'이번 원정 동안 누적 유지'}</p>${tower?'':'<button data-confirm-roll class="dialog-primary" disabled>결과를 기다리는 중…</button>'}`);
+        const container=q('dialog-content');
+        stopDice=animateDice(container,roll,()=>{
+            tone(true);
+            if(tower){sim.resolveUpgradeRoll();autoCloseTimer=window.setTimeout(()=>{close();flush();render();},window.matchMedia('(prefers-reduced-motion: reduce)').matches?80:200);}
+            else {const confirm=container.querySelector<HTMLButtonElement>('[data-confirm-roll]')!;confirm.disabled=false;confirm.textContent='축복 적용하고 계속';confirm.focus();}
+        });
+    }
+    button('upgrade-button', () => { if(selected===null)return;const roll=sim.rollTowerUpgrade(selected);if(roll)showDice(roll); });
+    button('speed-upgrade-button', () => {if(selected===null)return;const roll=sim.rollTowerUpgrade(selected,'haste');if(roll)showDice(roll);});
+    button('super-forge-button',()=>open('super-forge',superForgeMarkup(sim)));
+    button('dragon-shop-button',()=>{shopSlot=selected;open('shop',dragonShopMarkup(sim,shopSlot));});
+    button('blessings-button', () => {
+        const owned=REWARD_POOL.filter(r=>sim.getUpgradeValue(r.stat)>0);
+        open('blessings',heading('이번 원정에 누적 적용','수호대가 모은 축복',`${sim.rewardHistory.length}번의 선택 · ${owned.length}종 효과 활성`) + `<div class="blessing-list">${owned.length?owned.map(r=>`<article><span>${icon(r.icon)}</span><div><b>${r.title}</b><small>${r.description}</small></div><strong>+${sim.getUpgradeValue(r.stat)}${r.unit}</strong></article>`).join(''):'<p class="dialog-description">5웨이브를 클리어하면 무작위 축복 3개 중 하나를 선택할 수 있습니다.</p>'}</div><button data-close class="dialog-primary">전장으로 돌아가기</button>`);
+    });
     button('sort-button', () => { sim.sortUnitsByType(); scene?.clearSelection(); });
     button('bulk-merge-button', () => { sim.bulkMergeAll(); scene?.clearSelection(); });
     button('sell-button', () => { if (selected !== null)
@@ -96,13 +123,13 @@ export function createUi(sim: GameSimulation): UiHandle {
     });
     button('pause-button', () => paused = !paused);
     button('sound-button', () => { muted = !muted; q('sound-button').classList.toggle('enabled', !muted); q('sound-button').setAttribute('aria-label', muted ? '소리 켜기' : '소리 끄기'); q('sound-button').title = muted ? '소리 켜기' : '소리 끄기'; });
-    button('help-button', () => open('help', heading('플레이 가이드', '운명은 뽑고, 전술은 고르세요', '소환 · 배치 · 합성, 세 가지로 시작하는 달빛의 전투') + `<div class="guide-list"><article><b>01</b><div><h3>수호자를 모으세요</h3><p>시작 수호자 3명이 배치되어 있습니다. 골드로 동료를 소환하고 원정 시작을 누르세요.</p></div></article><article><b>02</b><div><h3>길목을 지키세요</h3><p>수호자를 드래그해 이동합니다. 클릭하면 사거리가 보입니다. 기사·마법사·사제를 함께 편성하면 공격력 +15%.</p></div></article><article><b>03</b><div><h3>합성하고, 결계를 펼치세요</h3><p>같은 수호자 3명을 합성하면 상위 등급을 직접 고릅니다. 달빛 결계는 현재 적을 3초간 얼립니다. 재사용 24초.</p></div></article><article><b>04</b><div><h3>60웨이브를 버티세요</h3><p>적은 순환 경로를 돌고, 제한시간 종료 시 생존한 일반 적 6명당 체력 1, 보스당 5를 잃습니다. 5웨이브마다 보스, 3웨이브마다 보상 선택. 실패해도 성장 조각은 남습니다.</p></div></article></div><button data-close class="dialog-primary">이제 지킬 준비가 됐어요</button>`));
+    button('help-button', () => open('help', heading('플레이 가이드', '운명은 뽑고, 전술은 고르세요', '소환 · 배치 · 합성, 세 가지로 시작하는 달빛의 전투') + `<div class="guide-list"><article><b>01</b><div><h3>수호자를 모으세요</h3><p>시작 수호자 3명이 배치되어 있습니다. 골드로 동료를 소환하고 원정 시작을 누르세요.</p></div></article><article><b>02</b><div><h3>길목을 지키세요</h3><p>수호자를 드래그해 이동합니다. 클릭하면 사거리가 보입니다. 기사·마법사·사제를 함께 편성하면 공격력 +15%.</p></div></article><article><b>03</b><div><h3>합성하고, 결계를 펼치세요</h3><p>같은 수호자 3명을 합성하면 상위 등급을 직접 고릅니다. 달빛 결계는 현재 적을 3초간 얼립니다. 기본 재사용 24초. 선택한 타워는 골드로 공격력 룰렛 또는 공격속도 주사위(+1~20%)를 강화합니다. 합성 시 수치가 계승됩니다. 슈퍼유니크 각성에는 같은 유형 유니크 1명·전설/영웅/희귀 각 3명과 10,000G가 필요합니다.</p></div></article><article><b>04</b><div><h3>120웨이브를 버티세요</h3><p>적은 순환 경로를 돌고, 제한시간 종료 시 생존한 일반 적 6명당 체력 1, 보스당 5를 잃습니다. 5웨이브마다 보스가 등장합니다. 5웨이브마다 26종 중 무작위 축복 3개를 제시하며, 하나를 골라 주사위로 강화량을 정합니다. 실패해도 성장 조각은 남습니다.</p></div></article></div><button data-close class="dialog-primary">이제 지킬 준비가 됐어요</button>`));
     let branch = skillTracks[0]!.id;
     function showSkills() {
         open('skills', heading('성장 조각은 원정이 끝나도 유지됩니다', '수호대의 유산', `보유 조각 ${sim.meta.growthShards} · 최고 기록 ${sim.meta.highestWave}웨이브`) + `<div class="skill-tabs">${skillTracks.map(t => `<button data-branch="${t.id}" class="${branch === t.id ? 'active' : ''}">${t.label}</button>`).join('')}</div><div class="skill-list">${skillTree.filter(n => n.branch === branch).map(n => { const owned = sim.meta.unlockedSkills.includes(n.id), locked = !!n.prerequisite && !sim.meta.unlockedSkills.includes(n.prerequisite); return `<button data-skill="${n.id}" ${owned || locked || sim.meta.growthShards < n.cost ? 'disabled' : ''}><b>${n.tier}</b><span>${n.description}</span><small>${owned ? '해금 완료' : `${n.cost} 조각`}</small></button>`; }).join('')}</div><button data-close class="dialog-primary">전장으로 돌아가기</button>`);
     }
     button('skill-toggle', showSkills);
-    dialog.addEventListener('cancel', e => { if (dialogKind === 'reward' || dialogKind === 'result')
+    dialog.addEventListener('cancel', e => { if (dialogKind === 'reward' || dialogKind === 'result' || dialogKind === 'dice')
         e.preventDefault();
     else {
         sim.cancelMerge();
@@ -112,6 +139,10 @@ export function createUi(sim: GameSimulation): UiHandle {
         const el = (e.target as HTMLElement).closest<HTMLButtonElement>('button');
         if (!el || el.disabled)
             return;
+        if(el.dataset.craftSuper){if(sim.craftSuper(el.dataset.craftSuper as TowerType)){close();scene?.selectSlot(sim.state.board.length-1);}else open('super-forge',superForgeMarkup(sim));}
+        if(el.dataset.shopSelect!==undefined){shopSlot=Number(el.dataset.shopSelect);open('shop',dragonShopMarkup(sim,shopSlot));}
+        if(el.dataset.itemBuy){shopSlot=Number(el.dataset.shopSlot);const ok=sim.buyDragonItem(shopSlot,el.dataset.itemBuy as DragonItemKind);open('shop',dragonShopMarkup(sim,shopSlot,ok?'장착 완료 · 자동 효과 활성':'구매 조건을 확인하세요.'));}
+        if(el.dataset.itemUpgrade){shopSlot=Number(el.dataset.shopSlot);const outcome=sim.upgradeDragonItem(shopSlot,el.dataset.itemUpgrade as DragonItemKind);open('shop',dragonShopMarkup(sim,shopSlot,outcome?outcome.success?`+${outcome.level} 강화 성공 · 추가 효과 +${outcome.gain}`:`강화 실패 · ${outcome.cost.toLocaleString()}G 사용, 기존 +${outcome.level} 유지`:'골드 또는 강화 한도를 확인하세요.'));}
         if (el.hasAttribute('data-close')) {
             sim.cancelMerge();
             close();
@@ -122,7 +153,11 @@ export function createUi(sim: GameSimulation): UiHandle {
             scene?.clearSelection();
         }
         if (el.dataset.reward) {
-            sim.chooseReward(el.dataset.reward as 'power' | 'supply' | 'repair');
+            const roll=sim.rollReward(el.dataset.reward);
+            if(roll)showDice(roll);
+        }
+        if (el.hasAttribute('data-confirm-roll')) {
+            sim.resolveUpgradeRoll();
             close();
         }
         if (el.dataset.branch) {
@@ -155,7 +190,7 @@ export function createUi(sim: GameSimulation): UiHandle {
     document.addEventListener('keydown', e => {
         if (e.repeat || dialog.open || /INPUT|TEXTAREA|SELECT/.test((e.target as HTMLElement).tagName))
             return;
-        const keys: Record<string, string> = { q: 'summon-button', w: 'advanced-summon-button', e: 'frost-button' };
+        const keys: Record<string, string> = { q: 'summon-button', w: 'advanced-summon-button', e: 'frost-button', r:'upgrade-button', t:'speed-upgrade-button' };
         if (e.code === 'Space' && (e.target as HTMLElement).tagName !== 'BUTTON') {
             e.preventDefault();
             q('pause-button').click();
@@ -174,7 +209,7 @@ export function createUi(sim: GameSimulation): UiHandle {
         q('hp-bar').style.width = `${100 * s.baseHealth / s.maxBaseHealth}%`;
         q('hp-bar').classList.toggle('danger', s.baseHealth < 6);
         q('gold-count').textContent = s.gold.toLocaleString();
-        q('unit-count').textContent = `${s.board.length} / 30`;
+        q('unit-count').textContent = `${s.board.length} / ${MAX_TOWERS}`;
         q('kill-count').textContent = String(s.defeatedEnemies);
         q('best-record').textContent = `최고 기록 ${sim.meta.highestWave} 웨이브`;
         q('phase-chip').textContent = ended ? (s.status === 'won' ? '방어 성공' : '성채 함락') : sim.isWaveActive ? (sim.activeWaveDefinition?.isBoss ? '보스 습격' : '전투 진행 중') : s.wave ? '다음 습격 준비' : '수호대 배치 중';
@@ -182,26 +217,34 @@ export function createUi(sim: GameSimulation): UiHandle {
         q('timer-chip').textContent = sim.isWaveActive ? `${Math.ceil(s.waveTimeRemainingMs / 1000)}초 · 적 ${sim.enemies.length}` : sim.nextWaveDelayRemainingMs > 0 ? `다음 웨이브까지 ${Math.ceil(sim.nextWaveDelayRemainingMs / 1000)}초` : '준비되면 원정을 시작하세요';
         q('summon-price').textContent = s.freeSummons > 0 ? `무료 ${s.freeSummons}` : `${sim.summonCost} G`;
         q('advanced-price').textContent = `${sim.advancedSummonCost} G`;
-        q<HTMLButtonElement>('summon-button').disabled = ended || s.board.length >= 30 || (s.gold < sim.summonCost && s.freeSummons === 0);
-        q<HTMLButtonElement>('advanced-summon-button').disabled = ended || s.board.length >= 30 || s.gold < sim.advancedSummonCost;
+        q<HTMLButtonElement>('summon-button').disabled = ended || s.board.length >= MAX_TOWERS || (s.gold < sim.summonCost && s.freeSummons === 0);
+        q<HTMLButtonElement>('advanced-summon-button').disabled = ended || s.board.length >= MAX_TOWERS || s.gold < sim.advancedSummonCost;
         q<HTMLButtonElement>('wave-button').disabled = !ended && (!sim.canStartWave || s.board.length === 0);
         q('wave-button').innerHTML = icon('play') + (ended ? '다시 도전' : s.wave === 0 ? '원정 시작' : sim.isWaveActive ? '방어 진행 중' : '다음 웨이브');
         q('pause-overlay').classList.toggle('hidden', !paused);
         q('pause-button').innerHTML = icon(paused ? 'play' : 'pause');
         q('pause-button').setAttribute('aria-label', paused ? '계속하기' : '일시정지');
         document.querySelectorAll<HTMLElement>('[data-speed]').forEach(b => { b.classList.toggle('active', Number(b.dataset.speed) === speed); b.setAttribute('aria-pressed', String(Number(b.dataset.speed) === speed)); });
-        const counts = { single: 0, area: 0, support: 0 };
-        s.board.forEach(u => counts[getUnitDefinition(u.definitionId).role]++);
-        q('synergies').innerHTML = Object.entries(counts).map(([role, n]) => `<div class="${n ? 'present' : ''}"><img src="${art}${role === 'single' ? 'knight' : role === 'area' ? 'wizard' : 'priest'}.png" alt=""><span>${role === 'single' ? '기사' : role === 'area' ? '마법사' : '사제'}</span><b>${n}</b></div>`).join('');
+        const counts:Record<TowerType,number>={archer:0,warrior:0,mage:0,priest:0};s.board.forEach(u=>counts[getTowerType(getUnitDefinition(u.definitionId))]++);
+        q('synergies').innerHTML=TOWER_TYPES.map(type=>`<div class="${counts[type]?'present':''}"><img src="${art}${({archer:'storm-archer',warrior:'knight',mage:'wizard',priest:'priest'})[type]}.png" alt=""><span>${TOWER_LABELS[type]}</span><b>${counts[type]}</b></div>`).join('');
         q('synergy-status').textContent = sim.formationBonus ? '공격력 +15% 활성' : '조합 대기';
         q('synergy-status').className = sim.formationBonus ? 'text-mint' : '';
         const unit = selected === null ? null : s.board[selected];
         if (unit) {
-            const d = getUnitDefinition(unit.definitionId), r = getRarity(d.rarity), stats = getEffectiveUnitStats(d, getUniqueUnitLevel(sim.meta, d.id));
-            q('selected-unit').innerHTML = `<img src="${art}${portrait(d.id)}.png" alt=""><div><small style="color:${r.color}">${r.label} 수호자</small><h3>${d.name}${d.uniqueAbility ? ` Lv.${getUniqueUnitLevel(sim.meta, d.id)}` : ''}</h3><p>공격 ${stats.attack} · 사거리 ${stats.range}</p><p>${d.role === 'single' ? '선두 적 집중 공격' : d.role === 'area' ? '주변 적 광역 공격' : '아군 공격속도 보조'}</p></div>`;
+            const d = getUnitDefinition(unit.definitionId), r = getRarity(d.rarity), stats = sim.getTowerCombatStats(selected!)!;
+            q('selected-unit').innerHTML = `<img src="${art}${portrait(d.id)}.png" alt=""><div><small style="color:${d.superUnique?'#ebd49e':r.color}">${d.superUnique?'유일슈퍼유니크':r.label} 수호자</small><h3>${d.name}${isUniqueUnit(d) ? ` Lv.${getUniqueUnitLevel(sim.meta, d.id)}` : ''}</h3><p>공격 ${stats.baseAttack} <em class="stat-gain">(+${(stats.attack-stats.baseAttack).toFixed(1)})</em> = ${stats.attack.toFixed(1)}</p><p>공속 ${(1000/stats.attackSpeed).toFixed(2)}/초 · ${d.superUnique?`장비 ${unit.items?.length??0}/3`: `사거리 ${Math.round(stats.range)}`}</p><p>${d.superUnique?(sim.isSuperBerserk(unit)?'광폭화 활성 · 공격/공속 2배':'광폭화 대기 · 자동 시전'):d.role === 'single' ? '선두 적 집중 공격' : d.role === 'area' ? '주변 적 광역 공격' : '아군 공격속도 보조'}</p></div>`;
         }
         else
             q('selected-unit').innerHTML = `<span class="empty-emblem">${icon('shield')}</span><div><small>수호자 정보</small><h3>함께할 수호자를 선택하세요</h3><p>전장 또는 아래 카드를 클릭하세요.</p></div>`;
+        const forge=q<HTMLButtonElement>('upgrade-button');
+        const forgeCost=selected===null?0:sim.getTowerUpgradeCost(selected);
+        forge.disabled=ended||!unit||s.gold<forgeCost||!!sim.pendingRoll||sim.pendingReward;
+        q<HTMLButtonElement>('speed-upgrade-button').disabled=forge.disabled;
+        q('speed-upgrade-price').textContent=unit?`${forgeCost} G`:'선택 필요';
+        q('upgrade-price').textContent=unit?`${forgeCost} G`:'선택 필요';
+        q('upgrade-hint').textContent=unit?`${unit.upgradeCount??0}회 강화 · 공격 +${unit.attackUpgradePercent??0}% / 공속 +${unit.speedUpgradePercent??0}%`:'수호자를 선택하면 골드로 공격력을 강화합니다.';
+        q('blessings-count').textContent=`${sim.rewardHistory.length}개`;
+        q('roster-hint').textContent=s.board.length>=MAX_TOWERS?'정원이 가득 찼습니다. 타워를 선택해 골드 강화하거나 합성하세요.':'같은 수호자 3명을 모아 상위 등급으로 합성하세요.';
         const groups = sim.getMergeableGroups();
         q<HTMLButtonElement>('merge-button').disabled = ended || (selected === null ? groups.length === 0 : !groups.some(g => g.includes(selected!)));
         q<HTMLButtonElement>('sell-button').disabled = ended || !unit;
@@ -211,11 +254,11 @@ export function createUi(sim: GameSimulation): UiHandle {
         q<HTMLButtonElement>('frost-button').disabled = ended || !sim.isWaveActive || sim.frostCooldownMs > 0 || paused;
         q('frost-status').textContent = sim.frostCooldownMs > 0 ? `${Math.ceil(sim.frostCooldownMs / 1000)}초` : '준비';
         q('shard-count').textContent = `${sim.meta.growthShards} 조각`;
-        const key = s.board.map(u => u.instanceId + ':' + getUniqueUnitLevel(sim.meta, u.definitionId)).join(',') + ':' + selected;
+        const key = s.board.map(u => u.instanceId + ':' + getUniqueUnitLevel(sim.meta, u.definitionId) + ':' + (u.attackUpgradePercent??0) + ':' + (u.speedUpgradePercent??0) + ':' + (u.items??[]).map(item=>item.kind+item.level+item.bonus).join(',') + ':' + sim.isSuperBerserk(u) + ':' + (u.definitionId==='super-priest'?(u.superElapsedMs??0)%15000<10000:false)).join(',') + ':' + selected + ':' + JSON.stringify(sim.upgrades);
         if (key !== rosterKey) {
             rosterKey = key;
             const mergeable = sim.getMergeableSlots();
-            q('roster').innerHTML = s.board.length ? s.board.map((u, i) => { const d = getUnitDefinition(u.definitionId), r = getRarity(d.rarity); return `<button data-unit="${i}" class="unit-card ${selected === i ? 'selected' : ''}" style="--rarity:${r.color}" aria-label="${d.name} 선택" aria-pressed="${selected === i}"><span class="unit-rarity">${r.label}${d.uniqueAbility ? ` · Lv.${getUniqueUnitLevel(sim.meta, d.id)}` : ''}</span><img src="${art}${portrait(d.id)}.png" alt=""><b>${d.name.replace(r.label + ' ', '')}</b><small>${mergeable.has(i) ? '합성 가능' : d.role === 'single' ? '집중 공격' : d.role === 'area' ? '광역 공격' : '공격 보조'}</small></button>`; }).join('') : `<p class="empty-roster">수호자를 소환해 방어선을 만드세요.</p>`;
+            q('roster').innerHTML = s.board.length ? s.board.map((u, i) => { const d = getUnitDefinition(u.definitionId), r = getRarity(d.rarity), cardStats=sim.getTowerCombatStats(i)!; return `<button data-unit="${i}" class="unit-card ${d.superUnique?'super-card':''} ${selected === i ? 'selected' : ''}" style="--rarity:${r.color}" aria-label="${d.name} 선택" aria-pressed="${selected === i}"><span class="unit-rarity">${d.superUnique?'슈퍼유니크':r.label}${isUniqueUnit(d) ? ` · Lv.${getUniqueUnitLevel(sim.meta, d.id)}` : ''}</span><img src="${art}${portrait(d.id)}.png" alt=""><b>${d.name.replace(r.label + ' ', '')}</b><small class="card-attack">공격 ${cardStats.baseAttack} <em>(+${(cardStats.attack-cardStats.baseAttack).toFixed(1)})</em></small><small>${u.attackUpgradePercent ? `강화 +${u.attackUpgradePercent}%` : mergeable.has(i) ? '합성 가능' : d.role === 'single' ? '집중 공격' : d.role === 'area' ? '광역 공격' : '공격 보조'}</small></button>`; }).join('') : `<p class="empty-roster">수호자를 소환해 방어선을 만드세요.</p>`;
         }
         document.querySelectorAll<HTMLElement>('[data-milestone]').forEach(el => el.classList.toggle('reached', s.wave >= Number(el.dataset.milestone)));
         const next = JSON.stringify(sim.meta);
@@ -223,8 +266,9 @@ export function createUi(sim: GameSimulation): UiHandle {
             saveMetaProgress(sim.meta);
             saved = next;
         }
-        if (sim.pendingReward && !dialog.open)
-            open('reward', heading(`${s.wave}웨이브 생존 보상`, '다음 전투를 위한 선택', '한 가지 축복을 고르세요. 선택하는 동안 전투는 멈춥니다.') + `<div class="choice-grid"><button class="choice" data-reward="power">${icon('swords')}<small>이번 원정에 영구 적용</small><h3>달의 축복</h3><strong>공격력 +12%</strong><p>모든 수호자가 더 강해집니다.<br>현재 강화 +${Math.round(sim.expeditionAttackBonus * 100)}%</p></button><button class="choice" data-reward="supply">${icon('coin')}<small>즉시 지급</small><h3>왕국의 보급</h3><strong>골드 +60</strong><p>더 많은 동료를 소환하고<br>강력한 조합을 완성하세요.</p></button><button class="choice" data-reward="repair">${icon('shield')}<small>최대 체력까지 회복</small><h3>성채 복구</h3><strong>내구도 +5</strong><p>무너진 방어선을 복구합니다.<br>현재 ${s.baseHealth} / ${s.maxBaseHealth}</p></button></div>`);
+        if (sim.pendingReward && !sim.pendingRoll && !dialog.open) {
+            open('reward', heading(`${s.wave}웨이브 생존 보상`, '어떤 축복에 운명을 맡길까요?', '26종 중 무작위로 등장한 3개 · 하나를 골라 주사위를 굴리세요.') + `<div class="choice-grid">${sim.rewardChoices.map(r=>{const max=Math.min(r.max,r.cap-sim.getUpgradeValue(r.stat)),min=Math.min(r.min,max);return `<button class="choice" data-reward="${r.id}">${icon(r.icon)}<small>${r.category} · 이번 원정 누적</small><h3>${r.title}</h3><strong>${r.label}<br>+${min}~${max}${r.unit}</strong><p>${r.description}</p><span class="reward-current">현재 +${sim.getUpgradeValue(r.stat)}${r.unit}</span><span class="roll-cta">선택하고 주사위 굴리기</span></button>`;}).join('')}</div><p class="dice-footnote">정규분포형 주사위: 낮거나 높은 극단값보다 중간값이 자주 나옵니다.</p>`);
+        }
     }
     function showEvents(events: SimulationEvent[]) {
         for (const e of events) {
@@ -240,7 +284,7 @@ export function createUi(sim: GameSimulation): UiHandle {
         }
         render();
     }
-    function flush() { showEvents(sim.drainEvents()); }
+    function flush() { const events=sim.drainEvents();scene?.playEvents(events);showEvents(events); }
     render();
     return { setScene(s) { scene = s; }, render, showEvents, setSelectedSlot(slot) { selected = slot; render(); }, getSpeedMultiplier() { return paused || dialog.open ? 0 : speed; } };
 }

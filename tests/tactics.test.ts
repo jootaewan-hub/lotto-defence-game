@@ -1,3 +1,5 @@
+import { MAX_TOWERS } from '../src/game/superUnits';
+import { REWARD_POOL } from '../src/game/upgrades';
 import { describe, expect, test } from 'vitest';
 import { GameSimulation } from '../src/game/simulation';
 import { createDefaultMetaProgress, createSeededRng } from '../src/game/systems';
@@ -22,21 +24,22 @@ describe('expedition tactics', () => {
         expect(sim.castFrost()).toBe(false);
         expect(sim.frostCooldownMs).toBeGreaterThan(0);
     });
-    test('third-wave reward stops time until one irreversible choice is made', () => {
+    test('wave reward stops time until one irreversible choice is made', () => {
         const sim = game();
-        sim.state.wave = 2;
-        sim.state.baseHealth = 100;
+        sim.state.wave = 4;
+        sim.state.baseHealth = 100; sim.state.maxBaseHealth = 100;
         sim.startNextWave();
-        sim.update(sim.waves[2]!.durationMs);
+        sim.update(sim.waves[4]!.durationMs);
         expect(sim.pendingReward).toBe(true);
         sim.update(100000);
-        expect(sim.state.wave).toBe(3);
-        const gold = sim.state.gold;
-        expect(sim.chooseReward('supply')).toBe(true);
-        expect(sim.state.gold).toBe(gold + 60);
-        expect(sim.chooseReward('supply')).toBe(false);
+        expect(sim.state.wave).toBe(5);
+        const reward = sim.rewardChoices[0]!;
+        const roll = sim.rollReward(reward.id)!;
+        expect(sim.resolveUpgradeRoll()).toBe(true);
+        expect(sim.getUpgradeValue(reward.stat)).toBe(roll.value);
+        expect(sim.rollReward(reward.id)).toBeNull();
         sim.update(5000);
-        expect(sim.state.wave).toBe(4);
+        expect(sim.state.wave).toBe(6);
     });
     test('ended runs cannot summon and restart clears expedition bonuses', () => {
         const sim = game();
@@ -65,20 +68,23 @@ describe('expedition tactics', () => {
     test('a full formation rejects recruitment without spending currency', () => {
         const sim = game();
         sim.state.gold = 10000;
-        for (let i = 0; i < 30; i++)
+        for (let i = 0; i < MAX_TOWERS; i++)
             expect(sim.summonToFirstEmpty()).toBe(true);
         const gold = sim.state.gold;
         expect(sim.summonAdvanced()).toBe(false);
         expect(sim.state.gold).toBe(gold);
-        expect(sim.state.board).toHaveLength(30);
+        expect(sim.state.board).toHaveLength(MAX_TOWERS);
     });
-    test('repair caps at maximum health and rewards cannot be taken twice', () => {
+    test('max-health rewards raise both health values and cannot be taken twice', () => {
         const sim = game();
         sim.pendingReward = true;
         sim.state.baseHealth = 19;
-        expect(sim.chooseReward('repair')).toBe(true);
-        expect(sim.state.baseHealth).toBe(20);
-        expect(sim.chooseReward('power')).toBe(false);
+        sim.rewardChoices = [REWARD_POOL.find(r => r.id === 'maxHealth')!];
+        const roll = sim.rollReward('maxHealth')!;
+        expect(sim.resolveUpgradeRoll()).toBe(true);
+        expect(sim.state.baseHealth).toBe(19 + roll.value);
+        expect(sim.state.maxBaseHealth).toBe(20 + roll.value);
+        expect(sim.rollReward('maxHealth')).toBeNull();
         expect(sim.expeditionAttackBonus).toBe(0);
     });
 });

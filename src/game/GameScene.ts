@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
 import { getPathPosition, PATH_POINTS } from './geometry';
 import { GameSimulation, type SimulationEvent } from './simulation';
-import { getUnitDefinition } from './units';
+import { getUnitDefinition, getUnitPortrait, getTowerType, getUniqueUnitLevel } from './units';
+import { SUPER_COLORS } from './superUnits';
 import { getRarity, getRarityIndex } from './rarities';
 import { CombatEffects } from './CombatEffects';
 const S = 1.8;
@@ -14,6 +15,7 @@ export class GameScene extends Phaser.Scene {
     private ink!: Phaser.GameObjects.Graphics;
     private combat!: CombatEffects;
     private lastWave = 0;
+    private visualTime = 0;
     private units = new Map<string, Phaser.GameObjects.Image>();
     private mobs = new Map<string, Phaser.GameObjects.Image>();
     private selected: number | null = null;
@@ -53,6 +55,7 @@ export class GameScene extends Phaser.Scene {
         this.input.on('gameout', () => this.dragging = null);
         this.events.once('shutdown', () => { this.combat.clear(); this.units.clear(); this.mobs.clear(); });
     }
+    playEvents(events: SimulationEvent[]) { this.combat?.emit(events); }
     clearSelection() { this.selected = null; this.onSelectionChange(null); }
     getSelectedSlot() { return this.selected; }
     selectSlot(slot: number) { this.selected = slot; this.onSelectionChange(slot); }
@@ -148,11 +151,13 @@ export class GameScene extends Phaser.Scene {
                 this.tweens.add({ targets: dot, y: dot.y - 35, alpha: 0.05, duration: 2400 + i * 133, yoyo: true, repeat: -1 });
             }
     }
-    update(time: number, delta: number) {
+    update(_time: number, delta: number) {
         if (!this.ink)
             return;
         const speed = this.getSpeedMultiplier();
         const step = Math.min(delta, 80) * speed;
+        this.visualTime += Math.min(delta,80) * Math.min(speed,2);
+        const time=this.visualTime;
         this.tweens.timeScale = Math.min(speed, 3);
         if (this.simulation.state.wave < this.lastWave) this.combat.clear();
         this.lastWave = this.simulation.state.wave;
@@ -175,10 +180,11 @@ export class GameScene extends Phaser.Scene {
             const def = getUnitDefinition(u.definitionId), p = point(u), rarity = getRarity(def.rarity);
             const color = Phaser.Display.Color.HexStringToColor(rarity.color).color;
             if (i === this.selected) {
+                const range = this.simulation.getTowerCombatStats(i)!.range;
                 this.ink.fillStyle(0x95dfca, 0.045);
-                this.ink.fillEllipse(p.x, p.y, def.range * S * 2, def.range * 1.25 * 2);
+                this.ink.fillEllipse(p.x, p.y, range * S * 2, range * 1.25 * 2);
                 this.ink.lineStyle(1, 0x95dfca, 0.3);
-                this.ink.strokeEllipse(p.x, p.y, def.range * S * 2, def.range * 1.25 * 2);
+                this.ink.strokeEllipse(p.x, p.y, range * S * 2, range * 1.25 * 2);
             }
             this.ink.fillStyle(0x030d12, 0.65);
             this.ink.fillEllipse(p.x, p.y + 13, 43, 17);
@@ -188,17 +194,25 @@ export class GameScene extends Phaser.Scene {
                 this.ink.fillStyle(0xffda8c, 0.85);
                 this.ink.fillCircle(p.x + 20, p.y - 28, 3);
             }
+            if(def.superUnique){
+                const color=SUPER_COLORS[getTowerType(def)],active=this.simulation.isSuperBerserk(u);
+                this.ink.fillStyle(color,active?0.16:0.08);this.ink.fillEllipse(p.x,p.y+7,91,39);
+                this.ink.lineStyle(2,color,0.7);this.ink.strokeEllipse(p.x,p.y+7,81,32);
+                this.ink.lineStyle(1,0xffe8b2,0.55);this.ink.strokeEllipse(p.x,p.y+7,96,42);
+                for(let k=0;k<6;k++){const angle=(this.reduced?0:time/1300)+k*Math.PI/3;const x=p.x+Math.cos(angle)*42,y=p.y+7+Math.sin(angle)*17;this.ink.fillStyle(k%2?0xffe4a0:color,0.9);this.ink.fillTriangle(x,y-4,x-3,y,x+3,y);this.ink.fillTriangle(x,y+4,x-3,y,x+3,y);}
+                for(let k=0;k<4;k++){const phase=((this.reduced?0:time/28)+k*19)%70;this.ink.fillStyle(color,(1-phase/70)*0.6);this.ink.fillCircle(p.x+Math.sin(k*7+time/1700)*28,p.y-phase,1.5);}
+            }
             let img = this.units.get(u.instanceId);
             if (!img) {
-                const key = def.uniqueAbility ? ({ 'multishot': 'storm-archer', 'poison': 'plague-warlock', 'slow': 'time-mage', 'freeze': 'frost-witch', 'berserk': 'berserker' }[def.uniqueAbility]) : def.role === 'single' ? 'knight' : def.role === 'area' ? 'wizard' : 'priest';
+                const key = getUnitPortrait(def);
                 img = this.add.image(p.x, p.y, key).setOrigin(0.5, 0.78).setDepth(5);
-                const size = 53 + Math.min(8, getRarityIndex(def.rarity) * 2);
+                const size = def.superUnique ? 86 + Math.min(10,getUniqueUnitLevel(this.simulation.meta,def.id)/10) : board.length>60?34:board.length>30?43:53 + Math.min(8, getRarityIndex(def.rarity) * 2);
                 img.setDisplaySize(size, size);
                 this.units.set(u.instanceId, img);
                 const glow = this.add.circle(p.x, p.y, 28, color, 0.25).setDepth(7);
                 this.tweens.add({ targets: glow, scale: 2, alpha: 0, duration: 500, onComplete: () => glow.destroy() });
             }
-            const size = 53 + Math.min(8, getRarityIndex(def.rarity) * 2);
+            const size = def.superUnique ? 86 + Math.min(10,getUniqueUnitLevel(this.simulation.meta,def.id)/10) : board.length>60?34:board.length>30?43:53 + Math.min(8, getRarityIndex(def.rarity) * 2);
             this.combat.applyPose(u.instanceId, img, p, size, this.reduced || !step ? 0 : Math.sin(time / 440 + i) * 1.2);
         });
         const enemyIds = new Set(this.simulation.enemies.map(e => e.id));

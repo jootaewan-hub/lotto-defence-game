@@ -1,3 +1,5 @@
+import { MAX_TOWERS, SUPER_COST, DRAGON_ITEMS, getSuperRecipe, getItemUpgradeChance, getItemUpgradeCost } from './superUnits';
+import { rollNormalInteger, sampleRewards, type ExpeditionUpgrades, type RewardDefinition, type UpgradeRoll, type UpgradeStat } from './upgrades';
 import { TOWER_FIELD, TOWER_RADIUS, TOWER_SPAWN, clampTowerPosition, getPathPosition } from "./geometry";
 import {
   MAX_WAVES,
@@ -16,6 +18,9 @@ import {
 } from "./systems";
 import type { Rng } from "./rng";
 import type {
+  TowerType,
+  DragonItemKind,
+  UnitInstance,
   EnemyState,
   EnemyStatusEffect,
   EnemyVariantId,
@@ -33,6 +38,7 @@ import type {
 import { getRarity, getRarityIndex } from "./rarities";
 import { getUniqueAbilityStats } from "./uniqueAbilities";
 import {
+  getTowerType,
   getEffectiveUnitStats,
   getUniqueUnitLevel,
   getUnitDefinition,
@@ -48,11 +54,13 @@ export interface MergePrompt {
 }
 
 export type SimulationEvent =
+  | { type: "superSkill"; skill: "berserk" | "blessing" | "inferno" | "dragon-ring" | "dragon-magic"; sourceId: string; at: { x: number; y: number }; targets?: { x: number; y: number }[] }
   | { type: "message"; text: string }
   | { type: "jackpot"; reward: JackpotReward; text: string }
   | {
       type: "attack";
       attackId: string;
+      superType?: TowerType;
       sourceId: string;
       unitLevel: number;
       target: { id: string; isBoss: boolean; variantTier: number };
@@ -111,7 +119,136 @@ export class GameSimulation {
   meta: MetaProgress;
   pendingMerge: MergePrompt | null = null;
   pendingReward = false;
-  expeditionAttackBonus = 0;
+  upgrades: ExpeditionUpgrades = {};
+  rewardChoices: RewardDefinition[] = [];
+  pendingRoll: UpgradeRoll | null = null;
+  rewardHistory: UpgradeRoll[] = [];
+
+  getUpgradeValue(stat: UpgradeStat): number { return this.upgrades[stat] ?? 0; }
+  private bonus(stat: UpgradeStat): number { return this.getUpgradeValue(stat) / 100; }
+  get expeditionAttackBonus(): number { return this.bonus('attack'); }
+  set expeditionAttackBonus(value: number) { this.upgrades.attack = value * 100; }
+
+  isSuperBerserk(unit: UnitInstance): boolean {
+    return this.currentWaveActive && Boolean(getUnitDefinition(unit.definitionId).superUnique) && (unit.superElapsedMs ?? 0) % 8000 < 5000;
+  }
+  private getSuperAura(): number {
+    return this.currentWaveActive && this.state.board.some(u => u.definitionId === 'super-priest' && (u.superElapsedMs ?? 0) % 15000 < 10000) ? 1.3 : 1;
+  }
+  getSuperRecipe(type: TowerType) { return getSuperRecipe(this.state.board, type, this.state.gold); }
+  private canManageTowers(): boolean { return !this.pendingMerge && !this.pendingRoll && !this.pendingReward && this.state.status !== 'won' && this.state.status !== 'lost'; }
+  craftSuper(type: TowerType): boolean {
+    if (!this.canManageTowers()) return false;
+    const recipe = this.getSuperRecipe(type);
+    if (!recipe.ready) return false;
+    const consumed = recipe.slots.map(i => this.state.board[i]!);
+    const anchor = consumed[0]!;
+    const inherited = consumed.reduce((total,u)=>({attackUpgradePercent:total.attackUpgradePercent+(u.attackUpgradePercent??0),speedUpgradePercent:total.speedUpgradePercent+(u.speedUpgradePercent??0),upgradeCount:total.upgradeCount+(u.upgradeCount??0),upgradeGoldSpent:total.upgradeGoldSpent+(u.upgradeGoldSpent??0)}),{attackUpgradePercent:0,speedUpgradePercent:0,upgradeCount:0,upgradeGoldSpent:0});
+    const ids = new Set(consumed.map(u=>u.instanceId));
+    const unit: UnitInstance = {instanceId:`unit-${++this.unitSequence}`,definitionId:`super-${type}`,x:anchor.x,y:anchor.y,cooldownMs:0,items:[],superElapsedMs:0,...inherited};
+    this.state = {...this.state,gold:this.state.gold-SUPER_COST,board:[...this.state.board.filter(u=>!ids.has(u.instanceId)),unit]};
+    this.meta = registerUniqueUnitAcquisition(this.meta,unit.definitionId);
+    this.events.push({type:'message',text:`유일슈퍼유니크 ${getUnitDefinition(unit.definitionId).name} 탄생!`});
+    this.events.push({type:'superSkill',skill:'berserk',sourceId:unit.instanceId,at:{x:unit.x,y:unit.y}});
+    return true;
+  }
+  buyDragonItem(slot: number, kind: DragonItemKind): boolean {
+    const unit=this.state.board[slot],definition=DRAGON_ITEMS.find(d=>d.kind===kind);
+    if (!this.canManageTowers() || !unit || !definition || !getUnitDefinition(unit.definitionId).superUnique || this.state.gold<definition.price || (unit.items?.length??0)>=3 || unit.items?.some(i=>i.kind===kind)) return false;
+    this.state.gold-=definition.price;
+    unit.items=[...(unit.items??[]),{kind,level:0,bonus:0,...(kind==='boots'?{waveSpeedPercent:this.randomInteger(10,80)}:{})}];
+    this.events.push({type:'message',text:`${definition.name} 장착 · 효과 자동 발동`});
+    return true;
+  }
+  upgradeDragonItem(slot: number, kind: DragonItemKind): {success:boolean;level:number;gain:number;cost:number}|null {
+    const unit=this.state.board[slot],item=unit?.items?.find(i=>i.kind===kind);
+    if (!this.canManageTowers() || !unit || !getUnitDefinition(unit.definitionId).superUnique || !item || item.level>=9) return null;
+    const level=item.level+1,cost=getItemUpgradeCost(level),chance=getItemUpgradeChance(level);
+    if(this.state.gold<cost)return null;
+    this.state.gold-=cost;
+    const success=chance===1||this.rng.next()<chance;
+    const gain=success?(kind==='weapon'?100:kind==='ring'?this.randomInteger(100,1000):this.randomInteger(10,80)):0;
+    if(success){item.level=level;item.bonus+=gain;}
+    this.events.push({type:'message',text:`${DRAGON_ITEMS.find(d=>d.kind===kind)!.name} ${success?`+${item.level} 강화 성공`:'강화 실패 · 기존 강화 유지'}`});
+    return {success,level:item.level,gain,cost};
+  }
+  private randomInteger(min:number,max:number):number {return Math.min(max,min+Math.floor(this.rng.next()*(max-min+1)));}
+  private tickSuperUnits(deltaMs: number): void {
+    if (!this.currentWaveActive) return;
+    for(const unit of this.state.board){
+      if(!getUnitDefinition(unit.definitionId).superUnique)continue;
+      const before=unit.superElapsedMs??0,after=before+deltaMs;
+      if(!unit.superStarted||Math.floor(before/8000)!==Math.floor(after/8000))this.events.push({type:'superSkill',skill:'berserk',sourceId:unit.instanceId,at:{x:unit.x,y:unit.y}});
+      if(unit.definitionId==='super-priest'&&(!unit.superStarted||Math.floor(before/15000)!==Math.floor(after/15000)))this.events.push({type:'superSkill',skill:'blessing',sourceId:unit.instanceId,at:{x:unit.x,y:unit.y},targets:this.state.board.map(u=>({x:u.x,y:u.y}))});
+      unit.superElapsedMs=after;unit.superStarted=true;
+    }
+  }
+  getTowerCombatStats(slot: number, shared?: {formation:number;aura:number}) {
+    const unit = this.state.board[slot];
+    if (!unit) return null;
+    const definition = getUnitDefinition(unit.definitionId);
+    const stats = getEffectiveUnitStats(definition, getUniqueUnitLevel(this.meta, definition.id));
+    const aura=shared?.aura??this.getSuperAura(), berserk=this.isSuperBerserk(unit)?2:1;
+    const weapon=unit.items?.find(i=>i.kind==='weapon'),boots=unit.items?.find(i=>i.kind==='boots');
+    const equipmentAttack=weapon?200+weapon.bonus:0;
+    const roleStat = definition.role === 'single' ? 'singleDamage' : definition.role === 'area' ? 'areaDamage' : 'supportDamage';
+    return { ...stats,
+      baseAttack: definition.attack,
+      attack: (stats.attack + equipmentAttack) * (1 + (unit.attackUpgradePercent ?? 0) / 100) * (1 + getSkillEffectTotal(this.meta, 'attackBonus') + this.expeditionAttackBonus + (shared?.formation??this.formationBonus)) * (1 + this.bonus(roleStat)) * aura * berserk,
+      attackSpeed: Math.max(35, stats.attackSpeed / ((1 + this.bonus('haste') + (unit.speedUpgradePercent??0)/100 + (boots?boots.bonus+(boots.waveSpeedPercent??0):0)/100) * aura * berserk)),
+      range: stats.range * (1 + this.bonus('range')),
+      criticalChance: Math.min(0.85, stats.criticalChance + this.bonus('criticalChance')),
+    };
+  }
+
+  getTowerUpgradeCost(slot: number): number {
+    const unit = this.state.board[slot];
+    return unit ? Math.max(1, Math.round((25 + (unit.upgradeCount ?? 0) * 15) * (1 - this.bonus('upgradeDiscount')))) : 0;
+  }
+
+  rollTowerUpgrade(slot: number, stat: 'attack' | 'haste' = 'attack'): UpgradeRoll | null {
+    const unit = this.state.board[slot];
+    if (!unit || this.pendingRoll || this.pendingReward || this.pendingMerge || this.state.status === 'won' || this.state.status === 'lost') return null;
+    const cost = this.getTowerUpgradeCost(slot);
+    if (this.state.gold < cost) return null;
+    const value = rollNormalInteger(this.rng, 1, 20);
+    this.state.gold -= cost;
+    this.pendingRoll = {kind: 'tower', title: getUnitDefinition(unit.definitionId).name, label: stat==='attack'?'타워 공격력':'타워 공격속도', stat, value, min: 1, max: 20, unit: '%', towerId: unit.instanceId, cost};
+    return this.pendingRoll;
+  }
+
+  rollReward(id: string): UpgradeRoll | null {
+    if (!this.pendingReward || this.pendingRoll || this.state.status === 'won' || this.state.status === 'lost') return null;
+    const reward = this.rewardChoices.find(r => r.id === id);
+    if (!reward) return null;
+    const remaining = reward.cap - this.getUpgradeValue(reward.stat);
+    const max = Math.min(reward.max, remaining), min = Math.min(reward.min, max);
+    if (max < 1) return null;
+    this.pendingRoll = {kind: 'reward', title: reward.title, label: reward.label, stat: reward.stat, value: rollNormalInteger(this.rng, min, max), min, max, unit: reward.unit};
+    return this.pendingRoll;
+  }
+
+  resolveUpgradeRoll(): boolean {
+    const roll = this.pendingRoll;
+    if (!roll) return false;
+    if (roll.kind === 'tower') {
+      const unit = this.state.board.find(u => u.instanceId === roll.towerId);
+      if (!unit) { this.state.gold += roll.cost ?? 0; this.pendingRoll = null; return false; }
+      if(roll.stat==='haste')unit.speedUpgradePercent=(unit.speedUpgradePercent??0)+roll.value;
+      else unit.attackUpgradePercent = (unit.attackUpgradePercent ?? 0) + roll.value;
+      unit.upgradeCount = (unit.upgradeCount ?? 0) + 1;
+      unit.upgradeGoldSpent = (unit.upgradeGoldSpent ?? 0) + (roll.cost ?? 0);
+    } else {
+      this.upgrades[roll.stat] = this.getUpgradeValue(roll.stat) + roll.value;
+      if (roll.stat === 'maxHealth') { this.state.maxBaseHealth += roll.value; this.state.baseHealth += roll.value; }
+      this.rewardHistory.push({ ...roll });
+      this.pendingReward = false;
+      this.rewardChoices = [];
+    }
+    this.pendingRoll = null;
+    this.events.push({type: 'message', text: `${roll.title} · ${roll.label} +${roll.value}${roll.unit}`});
+    return true;
+  }
   frostCooldownMs = 0;
 
   get formationBonus(): number {
@@ -119,20 +256,10 @@ export class GameSimulation {
   }
 
   castFrost(): boolean {
-    if (!this.currentWaveActive || this.frostCooldownMs > 0 || this.state.status !== 'running') return false;
-    this.frostCooldownMs = 24_000;
-    for (const enemy of this.enemies) enemy.effects.push({ kind: 'freeze', remainingMs: 3_000, magnitude: 1 });
-    this.events.push({ type: 'message', text: '달빛 결계 · 모든 적 3초 빙결' });
-    return true;
-  }
-
-  chooseReward(reward: 'power' | 'supply' | 'repair'): boolean {
-    if (!this.pendingReward || !['power', 'supply', 'repair'].includes(reward)) return false;
-    this.pendingReward = false;
-    if (reward === 'power') this.expeditionAttackBonus += 0.12;
-    if (reward === 'supply') this.state.gold += 60;
-    if (reward === 'repair') this.state.baseHealth = Math.min(this.state.maxBaseHealth, this.state.baseHealth + 5);
-    this.events.push({ type: 'message', text: reward === 'power' ? '달의 축복 · 이번 원정 공격력 +12%' : reward === 'supply' ? '왕국의 보급 · +60 골드' : '성채 복구 · 체력 +5' });
+    if (!this.currentWaveActive || this.pendingRoll || this.frostCooldownMs > 0 || this.state.status !== 'running') return false;
+    this.frostCooldownMs = 24_000 * (1 - this.bonus('frostCooldown'));
+    for (const enemy of this.enemies) enemy.effects.push({ kind: 'freeze', remainingMs: 3_000 * (1 + this.bonus('frostDuration')), magnitude: 1 });
+    this.events.push({ type: 'message', text: `달빛 결계 · 모든 적 ${(3 * (1 + this.bonus('frostDuration'))).toFixed(1)}초 빙결` });
     return true;
   }
 
@@ -165,7 +292,10 @@ export class GameSimulation {
     this.events.splice(0);
     this.pendingMerge = null;
     this.pendingReward = false;
-    this.expeditionAttackBonus = 0;
+    this.upgrades = {};
+    this.rewardChoices = [];
+    this.pendingRoll = null;
+    this.rewardHistory = [];
     this.frostCooldownMs = 0;
     this.enemySequence = 0;
     this.attackSequence = 0;
@@ -184,7 +314,7 @@ export class GameSimulation {
   }
 
   get summonCost(): number {
-    const discount = Math.min(0.5, getSkillEffectTotal(this.meta, "summonDiscount"));
+    const discount = Math.min(0.5, getSkillEffectTotal(this.meta, "summonDiscount") + this.bonus("summonDiscount"));
     const summonPressure = Math.floor(this.successfulSummons / SUMMONS_PER_COST_INCREASE);
     return Math.max(1, Math.round((BASE_SUMMON_COST + summonPressure) * (1 - discount)));
   }
@@ -194,7 +324,7 @@ export class GameSimulation {
   }
 
   get canStartWave(): boolean {
-    return this.state.status !== "lost" && this.state.status !== "won" && !this.currentWaveActive && this.nextWaveDelayMs <= 0;
+    return this.state.status !== "lost" && this.state.status !== "won" && !this.pendingReward && !this.pendingRoll && !this.currentWaveActive && this.nextWaveDelayMs <= 0;
   }
 
   get nextWaveDelayRemainingMs(): number {
@@ -233,6 +363,10 @@ export class GameSimulation {
       return;
     }
 
+    for(const unit of this.state.board)for(const item of unit.items??[])if(item.kind==='boots')item.waveSpeedPercent=this.randomInteger(10,80);
+    const income = this.getUpgradeValue('waveGold') + Math.min(100, Math.floor(this.state.gold * this.bonus('interest')));
+    this.state.gold += income;
+    this.state.baseHealth = Math.min(this.state.maxBaseHealth, this.state.baseHealth + this.getUpgradeValue('regeneration'));
     this.state = { ...this.state, wave: nextWave, waveTimeRemainingMs: wave.durationMs, status: "running" };
     this.remainingSpawns = wave.isTrueBoss ? 1 : Number.POSITIVE_INFINITY;
     this.spawnTimerMs = 0;
@@ -246,7 +380,7 @@ export class GameSimulation {
   }
 
   update(deltaMs: number): void {
-    if (deltaMs <= 0 || this.pendingReward || this.pendingMerge) return;
+    if (deltaMs <= 0 || this.pendingReward || this.pendingMerge || this.pendingRoll) return;
     if (this.state.status === "lost" || this.state.status === "won") {
       return;
     }
@@ -256,6 +390,7 @@ export class GameSimulation {
       return;
     }
     this.tickBuffs(deltaMs);
+    this.tickSuperUnits(deltaMs);
     this.tickEnemyEffects(deltaMs);
     this.spawnEnemies(deltaMs);
     this.moveEnemies(deltaMs);
@@ -273,9 +408,9 @@ export class GameSimulation {
   }
 
   private summon(kind: SummonKind): boolean {
-    if (this.state.status === 'won' || this.state.status === 'lost' || this.pendingMerge || this.pendingReward) return false;
-    if (this.state.board.length >= 30) {
-      this.events.push({ type: 'message', text: '수호대 정원 30명 · 합성으로 자리를 확보하세요.' });
+    if (this.state.status === 'won' || this.state.status === 'lost' || this.pendingMerge || this.pendingReward || this.pendingRoll) return false;
+    if (this.state.board.length >= MAX_TOWERS) {
+      this.events.push({ type: 'message', text: `수호대 정원 ${MAX_TOWERS}명 · 합성이나 골드 강화를 이용하세요.` });
       return false;
     }
     if (kind === "normal" && this.state.freeSummons > 0) {
@@ -352,12 +487,13 @@ export class GameSimulation {
   }
 
   sellUnit(slot: number): boolean {
+    if (this.pendingRoll || this.pendingMerge || this.pendingReward) return false;
     const unit = this.state.board[slot];
     if (!unit) {
       return false;
     }
     const definition = getUnitDefinition(unit.definitionId);
-    const refund = 10 + getRarityIndex(definition.rarity) * 7;
+    const refund = 10 + getRarityIndex(definition.rarity) * 7 + Math.floor((unit.upgradeGoldSpent ?? 0) * 0.5);
     const board = [...this.state.board];
     board.splice(slot, 1);
     this.state = { ...this.state, board, gold: this.state.gold + refund };
@@ -366,6 +502,7 @@ export class GameSimulation {
   }
 
   requestMerge(slot?: number): MergePrompt | null {
+    if (this.pendingRoll || this.pendingReward) return null;
     const targetSlot = slot ?? this.state.board.findIndex((entry, index) => entry && this.findMatchingSlots(index).length >= 3);
     if (targetSlot < 0 || !this.state.board[targetSlot]) {
       this.events.push({ type: "message", text: "합성할 유닛 3개가 필요해요." });
@@ -412,6 +549,7 @@ export class GameSimulation {
   }
 
   bulkMergeAll(): number {
+    if (this.pendingRoll || this.pendingReward) return 0;
     let mergedCount = 0;
 
     while (true) {
@@ -469,6 +607,10 @@ export class GameSimulation {
   }
 
   private applyMerge(sourceSlots: number[], candidate: UnitDefinition): boolean {
+    const inherited = sourceSlots.reduce((total, slot) => {
+      const unit = this.state.board[slot];
+      return { speedUpgradePercent: total.speedUpgradePercent + (unit?.speedUpgradePercent ?? 0), attackUpgradePercent: total.attackUpgradePercent + (unit?.attackUpgradePercent ?? 0), upgradeCount: total.upgradeCount + (unit?.upgradeCount ?? 0), upgradeGoldSpent: total.upgradeGoldSpent + (unit?.upgradeGoldSpent ?? 0) };
+    }, { speedUpgradePercent: 0, attackUpgradePercent: 0, upgradeCount: 0, upgradeGoldSpent: 0 });
     const [targetSlot, ...consumedSlots] = sourceSlots;
     const board = [...this.state.board];
     const sourceUnit = board[targetSlot!];
@@ -484,6 +626,7 @@ export class GameSimulation {
       instanceId: `unit-${this.unitSequence += 1}`,
       definitionId: candidate.id,
       cooldownMs: 150,
+      ...inherited,
       x: sourceUnit.x,
       y: sourceUnit.y,
     };
@@ -574,7 +717,6 @@ export class GameSimulation {
       return getUnitDefinition(unit.definitionId).role === "support" ? count + 1 : count;
     }, 0);
     const supportSpeedMultiplier = Math.min(1.25, 1 + supportCount * 0.025);
-    const attackBonus = 1 + getSkillEffectTotal(this.meta, "attackBonus") + this.formationBonus + this.expeditionAttackBonus;
     const attackBuff = this.getBuffMultiplier("attack");
     const speedBuff =
       this.getBuffMultiplier("attackSpeed") *
@@ -582,13 +724,14 @@ export class GameSimulation {
       (1 + getSkillEffectTotal(this.meta, "attackSpeedBonus"));
     const criticalChanceBonus = getSkillEffectTotal(this.meta, "criticalChanceBonus");
     const uniqueAttackBonus = getSkillEffectTotal(this.meta, "uniqueAttackBonus");
-    const uniqueSkillPowerBonus = getSkillEffectTotal(this.meta, "uniqueSkillPowerBonus");
-    const bossDamageBonus = getSkillEffectTotal(this.meta, "bossDamageBonus");
+    const uniqueSkillPowerBonus = getSkillEffectTotal(this.meta, "uniqueSkillPowerBonus") + this.bonus("skillPower");
+    const bossDamageBonus = getSkillEffectTotal(this.meta, "bossDamageBonus") + this.bonus("bossDamage");
 
-    this.state.board.forEach((unit) => {
+    const shared={formation:this.formationBonus,aura:this.getSuperAura()};
+    this.state.board.forEach((unit, unitIndex) => {
       const definition = getUnitDefinition(unit.definitionId);
       const uniqueLevel = getUniqueUnitLevel(this.meta, definition.id);
-      const stats = getEffectiveUnitStats(definition, uniqueLevel);
+      const stats = this.getTowerCombatStats(unitIndex,shared)!;
       const abilityStats = definition.uniqueAbility ? getUniqueAbilityStats(definition.uniqueAbility, uniqueLevel) : null;
       const berserkStats = abilityStats?.ability === "berserk" ? abilityStats : null;
       const multishotStats = abilityStats?.ability === "multishot" ? abilityStats : null;
@@ -602,7 +745,8 @@ export class GameSimulation {
 
       const rarity = getRarity(definition.rarity);
       const rarityTier = getRarityIndex(definition.rarity);
-      const targets = this.findTargets(unit, stats.range, multishotStats?.targetCount ?? 1);
+      const superType=definition.superUnique?getTowerType(definition):undefined;
+      const targets = superType==='mage'?this.enemies.filter(e=>e.hp>0):this.findTargets(unit, stats.range, superType==='archer'||superType==='warrior'?5:multishotStats?.targetCount ?? 1);
       unit.cooldownMs = stats.attackSpeed;
       if (targets.length === 0) {
         return;
@@ -611,14 +755,15 @@ export class GameSimulation {
       const critical = this.rng.next() < Math.min(0.85, stats.criticalChance + criticalChanceBonus);
       const damage = Math.round(
         stats.attack *
-          attackBonus *
           attackBuff *
           (definition.uniqueAbility ? 1 + uniqueAttackBonus : 1) *
-          (critical ? 1.75 : 1) *
+          (critical ? 1.75 + this.bonus("criticalDamage") : 1) *
           (multishotStats ? multishotStats.damageMultiplier * (1 + uniqueSkillPowerBonus) : 1) *
           (berserkActive ? berserkStats!.damageMultiplier * (1 + uniqueSkillPowerBonus) : 1),
       );
       const origin = { x: unit.x, y: unit.y };
+      const weapon=unit.items?.find(i=>i.kind==='weapon'),ring=unit.items?.find(i=>i.kind==='ring');
+      if(superType==='mage')this.events.push({type:'superSkill',skill:'inferno',sourceId:unit.instanceId,at:origin,targets:targets.map(e=>getPathPosition(e.progress))});
 
       if (berserkStats) {
         unit.berserkRemainingMs = berserkStats.durationMs;
@@ -631,6 +776,7 @@ export class GameSimulation {
           type: "attack",
           attackId,
           sourceId: unit.instanceId,
+          superType,
           unitLevel: uniqueLevel,
           target: { id: target.id, isBoss: target.isBoss, variantTier: target.variantTier },
           from: origin,
@@ -639,17 +785,17 @@ export class GameSimulation {
           rarityTier,
           color: rarity.color,
           role: definition.role,
-          ability: definition.uniqueAbility,
+          ability: definition.uniqueAbility ?? (getTowerType(definition) === "archer" ? "multishot" : undefined),
         });
-        if (definition.role === "area" && definition.uniqueAbility !== "freeze") {
+        if (!definition.superUnique && definition.role === "area" && definition.uniqueAbility !== "freeze") {
           for (const enemy of this.enemies) {
             if (enemy.hp <= 0) {
               continue;
             }
             const position = getPathPosition(enemy.progress);
-            if (Math.hypot(position.x - targetPosition.x, position.y - targetPosition.y) <= 72) {
+            if (Math.hypot(position.x - targetPosition.x, position.y - targetPosition.y) <= 72 * (1 + this.bonus("splashRadius"))) {
               const bossAdjustedDamage = Math.round(damage * (enemy.isBoss ? 1 + bossDamageBonus : 1));
-              const areaDamage = applyArmor(Math.round(bossAdjustedDamage * 0.75), enemy.armor);
+              const areaDamage = applyArmor(Math.round(bossAdjustedDamage * 0.75), enemy.armor * (1 - this.bonus("armorPierce")));
               enemy.lastHitByDefinitionId = definition.id;
               enemy.hp -= areaDamage;
               applyUniqueAbility(enemy, definition, areaDamage, uniqueLevel, uniqueSkillPowerBonus, this.rng);
@@ -657,13 +803,20 @@ export class GameSimulation {
             }
           }
         } else {
-          const bossAdjustedDamage = Math.round(damage * (target.isBoss ? 1 + bossDamageBonus : 1));
-          const reducedDamage = applyArmor(bossAdjustedDamage, target.armor);
+          const bossAdjustedDamage = Math.round(damage * (target.isBoss ? (1 + bossDamageBonus) * (superType==='archer'||superType==='warrior'?5:1) : 1));
+          const magic=weapon&&weapon.level>=7?this.randomInteger(1000,100000):0;
+          if(magic)this.events.push({type:'superSkill',skill:'dragon-magic',sourceId:unit.instanceId,at:targetPosition});
+          const reducedDamage = applyArmor(bossAdjustedDamage, target.armor * (1 - this.bonus("armorPierce"))) + magic;
           target.lastHitByDefinitionId = definition.id;
           target.hp -= reducedDamage;
           applyUniqueAbility(target, definition, reducedDamage, uniqueLevel, uniqueSkillPowerBonus, this.rng);
           this.events.push({ type: "damage", attackId, targetId: target.id, at: targetPosition, amount: reducedDamage, critical, rarityTier });
         }
+      }
+      if(ring&&this.rng.next()<0.1){
+        const alive=this.enemies.filter(e=>e.hp>0);
+        for(const enemy of alive){const amount=100+ring.bonus;enemy.hp-=amount;enemy.lastHitByDefinitionId=definition.id;this.events.push({type:'damage',targetId:enemy.id,at:getPathPosition(enemy.progress),amount,critical:false,rarityTier});}
+        this.events.push({type:'superSkill',skill:'dragon-ring',sourceId:unit.instanceId,at:origin,targets:alive.map(e=>getPathPosition(e.progress))});
       }
     });
 
@@ -693,7 +846,7 @@ export class GameSimulation {
 
       const position = getPathPosition(enemy.progress);
       this.enemies.splice(index, 1);
-      const goldBonus = 1 + getSkillEffectTotal(this.meta, "goldBonus");
+      const goldBonus = 1 + getSkillEffectTotal(this.meta, "goldBonus") + this.bonus("goldBonus");
       const goldReward = rollKillGoldReward(Math.round(enemy.rewardGold * goldBonus), this.rng);
       this.state = {
         ...this.state,
@@ -707,7 +860,7 @@ export class GameSimulation {
         if (isUniqueUnit(killer)) {
           const experienceAmount = Math.max(
             1,
-            Math.round(getEnemyExperienceReward(enemy) * (1 + getSkillEffectTotal(this.meta, "uniqueExperienceBonus"))),
+            Math.round(getEnemyExperienceReward(enemy) * (1 + getSkillEffectTotal(this.meta, "uniqueExperienceBonus") + this.bonus("experience"))),
           );
           const result = grantUniqueUnitExperience(this.meta, killer.id, experienceAmount);
           this.meta = result.meta;
@@ -761,7 +914,7 @@ export class GameSimulation {
         if (nextEffect.kind === "poison") {
           nextEffect.tickMs = (nextEffect.tickMs ?? POISON_TICK_MS) - deltaMs;
           while ((nextEffect.tickMs ?? 0) <= 0 && nextEffect.remainingMs > 0) {
-            const poisonDamage = Math.max(1, Math.round(nextEffect.magnitude));
+            const poisonDamage = Math.max(1, Math.round(nextEffect.magnitude * (1 + this.bonus("poisonDamage"))));
             if (nextEffect.sourceDefinitionId) {
               enemy.lastHitByDefinitionId = nextEffect.sourceDefinitionId;
             }
@@ -813,7 +966,7 @@ export class GameSimulation {
     const bossDamage = this.enemies.filter((enemy) => enemy.isBoss).length * 5;
     const normalSurvivors = this.enemies.filter((enemy) => !enemy.isBoss).length;
     const rawSurvivorDamage = bossDamage + Math.ceil(normalSurvivors / 6);
-    const damageReduction = Math.min(0.8, getSkillEffectTotal(this.meta, "leakDamageReduction"));
+    const damageReduction = Math.min(0.8, getSkillEffectTotal(this.meta, "leakDamageReduction") + this.bonus("damageReduction"));
     const survivorDamage = rawSurvivorDamage > 0 ? Math.max(1, Math.ceil(rawSurvivorDamage * (1 - damageReduction))) : 0;
     this.enemies.splice(0);
     this.remainingSpawns = 0;
@@ -846,7 +999,8 @@ export class GameSimulation {
     }
 
     this.nextWaveDelayMs = NEXT_WAVE_DELAY_MS;
-    this.pendingReward = completedWave % 3 === 0;
+    this.rewardChoices = completedWave % 5 === 0 ? sampleRewards(this.rng, this.upgrades) : [];
+    this.pendingReward = this.rewardChoices.length > 0;
   }
 
   private tickNextWaveDelay(deltaMs: number): boolean {
@@ -929,7 +1083,7 @@ export class GameSimulation {
   private rollSummonUnit(kind: SummonKind): { unit: UnitDefinition; pityActivated: boolean } {
     let unit =
       kind === "advanced"
-        ? rollAdvancedUniqueUnit(this.rng, getSkillEffectTotal(this.meta, "uniqueSummonBonus"))
+        ? rollAdvancedUniqueUnit(this.rng, getSkillEffectTotal(this.meta, "uniqueSummonBonus") + this.bonus("uniqueChance"))
         : null;
     let rarity: RarityId = unit?.rarity ?? pickRarity(this.rng, kind);
     let pityActivated = false;
@@ -957,7 +1111,7 @@ export class GameSimulation {
   private getJackpotChance(): number {
     const skillBonus = getSkillEffectTotal(this.meta, "jackpotChance");
     const pityBonus = Math.min(JACKPOT_PITY_MAX_BONUS, this.jackpotMisses * JACKPOT_PITY_STEP);
-    return Math.min(0.16, BASE_JACKPOT_CHANCE + skillBonus + pityBonus);
+    return Math.min(0.30, BASE_JACKPOT_CHANCE + skillBonus + pityBonus + this.bonus("jackpotChance"));
   }
 
   private endRun(status: "won" | "lost"): void {
