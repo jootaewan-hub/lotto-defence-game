@@ -36,6 +36,7 @@ export class GameScene extends Phaser.Scene {
             this.load.image(key, `${ASSETS}${key}.png`);
         this.load.image('super-atlas', `${import.meta.env.BASE_URL}assets/generated/super-unique-atlas.png`);
         this.load.image('evolution-atlas', `${import.meta.env.BASE_URL}assets/generated/tower-evolution-atlas.png`);
+        this.load.svg('ultimate-mugeuk', `${import.meta.env.BASE_URL}assets/generated/ultimate-mugeuk.svg`);
         this.load.image('forest', `${import.meta.env.BASE_URL}assets/moonwood.png`);
         for (const difficulty of ['nightmare', 'hell', 'insane'] as const)
             this.load.svg(BATTLE_THEMES[difficulty].texture, `${import.meta.env.BASE_URL}assets/backgrounds/${difficulty}.svg`);
@@ -213,7 +214,7 @@ export class GameScene extends Phaser.Scene {
             const def = getUnitDefinition(u.definitionId), p = point(u), rarity = getRarity(def.rarity);
             const color = Phaser.Display.Color.HexStringToColor(rarity.color).color;
             const visual = getEvolutionVisual(def, getUniqueUnitLevel(this.simulation.meta, def.id), board.length);
-            drawEvolutionOrnaments(this.ink, p.x, p.y, visual, getTowerType(def), def.superUnique ? SUPER_COLORS[getTowerType(def)] : color, this.reduced || !step ? 0 : time, board.length > 60);
+            drawEvolutionOrnaments(this.ink, p.x, p.y, visual, getTowerType(def), def.ultimate ? 0xffe6a3 : def.superUnique ? SUPER_COLORS[getTowerType(def)] : color, this.reduced || !step ? 0 : time, board.length > 60);
             if (i === this.selected) {
                 const range = this.simulation.getTowerCombatStats(i)!.range;
                 this.ink.fillStyle(0x95dfca, 0.045);
@@ -230,7 +231,7 @@ export class GameScene extends Phaser.Scene {
                 this.ink.fillCircle(p.x + 20, p.y - 28, 3);
             }
             if(def.superUnique){
-                const color=SUPER_COLORS[getTowerType(def)],active=this.simulation.isSuperBerserk(u);
+                const color=def.ultimate?0xffe6a3:SUPER_COLORS[getTowerType(def)],active=this.simulation.isSuperBerserk(u);
                 this.ink.fillStyle(color,active?0.16:0.08);this.ink.fillEllipse(p.x,p.y+7,91,39);
                 this.ink.lineStyle(2,color,0.7);this.ink.strokeEllipse(p.x,p.y+7,81,32);
                 this.ink.lineStyle(1,0xffe8b2,0.55);this.ink.strokeEllipse(p.x,p.y+7,96,42);
@@ -240,7 +241,7 @@ export class GameScene extends Phaser.Scene {
             let img = this.units.get(u.instanceId);
             if (!img) {
                 const key = getUnitPortrait(def);
-                const texture = def.superUnique ? 'super-atlas' : key.startsWith('evolution-') ? 'evolution-atlas' : key;
+                const texture = def.ultimate ? 'ultimate-mugeuk' : def.superUnique ? 'super-atlas' : key.startsWith('evolution-') ? 'evolution-atlas' : key;
                 img = this.add.image(p.x, p.y, texture, texture !== key ? key : undefined).setOrigin(0.5, 0.78).setDepth(5);
                 const size = visual.size;
                 img.setDisplaySize(size, size);

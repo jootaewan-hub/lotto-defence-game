@@ -31,3 +31,6 @@ Credit is not required for CC0, but keeping this file makes the asset lineage cl
 
 ### 난이도별 배경
 `public/assets/backgrounds/nightmare.svg`, `hell.svg`, `insane.svg`는 프로젝트용으로 직접 작성한 SVG 배경입니다. 재현 가능한 생성 소스는 `generate-backgrounds.py`입니다.
+
+### 무극신
+`public/assets/generated/ultimate-mugeuk.svg`는 태극 광륜·흑백 도포·부유 검을 표현하도록 프로젝트용으로 직접 제작한 궁극 유닛 벡터 이미지입니다.

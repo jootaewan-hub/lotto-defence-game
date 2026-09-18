@@ -31,6 +31,7 @@ export interface Rarity {
 }
 
 export interface UnitDefinition {
+  ultimate?: boolean;
   towerType?: TowerType;
   superUnique?: boolean;
   id: string;
@@ -64,6 +65,7 @@ export interface ActiveBuff {
 }
 
 export interface UnitInstance {
+  ultimateCooldownMs?: number;
   speedUpgradePercent?: number;
   superElapsedMs?: number;
   superStarted?: boolean;

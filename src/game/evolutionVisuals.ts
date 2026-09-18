@@ -9,9 +9,9 @@ export function getEvolutionVisual(unit: UnitDefinition, level = 1, boardCount =
     return {
         stage,
         skillStage,
-        label: unit.superUnique ? '최종 각성' : `진화 ${stage}단계`,
-        badge: unit.superUnique ? '★' : String(stage),
-        size: unit.superUnique ? 91 + skillStage * .45 : (43 + (stage - 1) * 3.8 + skillStage * .35) * crowdScale,
+        label: unit.ultimate ? '궁극 각성' : unit.superUnique ? '최종 각성' : `진화 ${stage}단계`,
+        badge: unit.ultimate ? '∞' : unit.superUnique ? '★' : String(stage),
+        size: unit.ultimate ? 116 + skillStage * .4 : unit.superUnique ? 91 + skillStage * .45 : (43 + (stage - 1) * 3.8 + skillStage * .35) * crowdScale,
         ornaments: unit.superUnique ? 10 : stage - 1,
         rings: stage >= 7 ? 3 : stage >= 4 ? 2 : 1,
         particles: Math.min(8, Math.max(0, stage - 3) + Math.floor(skillStage / 5)),

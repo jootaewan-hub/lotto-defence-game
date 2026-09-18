@@ -40,7 +40,7 @@ export interface SuperRecipe {
 }
 export function getSuperRecipe(board: readonly UnitInstance[], type: TowerType, gold: number): SuperRecipe {
     const recipe: SuperRecipe = { type, unique: [], legendary: [], hero: [], epic: [], owned: false, ready: false, slots: [] };
-    board.forEach((unit, index) => { const d = getUnitDefinition(unit.definitionId); if (getTowerType(d) !== type)
+    board.forEach((unit, index) => { const d = getUnitDefinition(unit.definitionId); if (d.ultimate || getTowerType(d) !== type)
         return; if (d.superUnique) {
         recipe.owned = true;
         return;

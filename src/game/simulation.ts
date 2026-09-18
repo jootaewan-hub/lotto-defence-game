@@ -1,5 +1,6 @@
 import { MAX_TOWERS, MAX_ITEM_UPGRADE_LEVEL, SUPER_COST, DRAGON_ITEMS, getSuperRecipe, getItemUpgradeChance, getItemUpgradeCost } from './superUnits';
 import { DIFFICULTIES } from './waves';
+import { ULTIMATE_ID, ULTIMATE_COST, getUltimateRecipe } from './ultimate';
 import { rollNormalInteger, sampleRewards, type ExpeditionUpgrades, type RewardDefinition, type UpgradeRoll, type UpgradeStat } from './upgrades';
 import { TOWER_FIELD, TOWER_RADIUS, TOWER_SPAWN, clampTowerPosition, getPathPosition } from "./geometry";
 import {
@@ -55,7 +56,7 @@ export interface MergePrompt {
 }
 
 export type SimulationEvent =
-  | { type: "superSkill"; skill: "berserk" | "blessing" | "inferno" | "dragon-ring" | "dragon-magic"; sourceId: string; at: { x: number; y: number }; targets?: { x: number; y: number }[] }
+  | { type: "superSkill"; skill: "berserk" | "blessing" | "inferno" | "dragon-ring" | "dragon-magic" | "heaven-split"; sourceId: string; at: { x: number; y: number }; targets?: { x: number; y: number }[] }
   | { type: "message"; text: string }
   | { type: "jackpot"; reward: JackpotReward; text: string }
   | {
@@ -132,12 +133,45 @@ export class GameSimulation {
   set expeditionAttackBonus(value: number) { this.upgrades.attack = value * 100; }
 
   isSuperBerserk(unit: UnitInstance): boolean {
-    return this.currentWaveActive && Boolean(getUnitDefinition(unit.definitionId).superUnique) && (unit.superElapsedMs ?? 0) % 8000 < 5000;
+    const def = getUnitDefinition(unit.definitionId);
+    return this.currentWaveActive && Boolean(def.superUnique) && (unit.superElapsedMs ?? 0) % (def.ultimate ? 10000 : 8000) < (def.ultimate ? 6000 : 5000);
   }
   private getSuperAura(): number {
+    if (this.currentWaveActive && this.state.board.some(u => u.definitionId === ULTIMATE_ID)) return 1.5;
     return this.currentWaveActive && this.state.board.some(u => u.definitionId === 'super-priest' && (u.superElapsedMs ?? 0) % 15000 < 10000) ? 1.3 : 1;
   }
   getSuperRecipe(type: TowerType) { return getSuperRecipe(this.state.board, type, this.state.gold); }
+  getUltimateRecipe() { return getUltimateRecipe(this.state.board, this.state.gold); }
+  craftUltimate(): boolean {
+    if (!this.canManageTowers()) return false;
+    const recipe = this.getUltimateRecipe();
+    if (!recipe.ready) return false;
+    const consumed = recipe.slots.map(i => this.state.board[i]!);
+    const anchor = consumed[0]!;
+    const inherited = consumed.reduce((total, u) => ({
+      attackUpgradePercent: total.attackUpgradePercent + (u.attackUpgradePercent ?? 0),
+      speedUpgradePercent: total.speedUpgradePercent + (u.speedUpgradePercent ?? 0),
+      upgradeCount: total.upgradeCount + (u.upgradeCount ?? 0),
+      upgradeGoldSpent: total.upgradeGoldSpent + (u.upgradeGoldSpent ?? 0),
+    }), { attackUpgradePercent: 0, speedUpgradePercent: 0, upgradeCount: 0, upgradeGoldSpent: 0 });
+    const items: NonNullable<UnitInstance['items']> = [];
+    for (const unit of consumed) for (const item of unit.items ?? []) {
+      const existing = items.find(i => i.kind === item.kind);
+      if (!existing) items.push({ ...item });
+      else {
+        existing.level = Math.max(existing.level, item.level);
+        existing.bonus += item.bonus;
+        if (item.kind === 'boots') existing.waveSpeedPercent = (existing.waveSpeedPercent ?? 0) + (item.waveSpeedPercent ?? 0);
+      }
+    }
+    const unit: UnitInstance = { instanceId: `unit-${++this.unitSequence}`, definitionId: ULTIMATE_ID, x: anchor.x, y: anchor.y, cooldownMs: 0, superElapsedMs: 0, ultimateCooldownMs: 0, items, ...inherited };
+    const slots = new Set(recipe.slots);
+    this.state = { ...this.state, gold: this.state.gold - ULTIMATE_COST, board: [...this.state.board.filter((_, i) => !slots.has(i)), unit] };
+    this.meta = registerUniqueUnitAcquisition(this.meta, ULTIMATE_ID);
+    this.events.push({ type: 'message', text: '궁극 각성 · 무극신 강림! 네 수호자의 강화와 장비 보너스를 계승했습니다.' });
+    this.events.push({ type: 'superSkill', skill: 'heaven-split', sourceId: unit.instanceId, at: { x: unit.x, y: unit.y } });
+    return true;
+  }
   private canManageTowers(): boolean { return !this.pendingMerge && !this.pendingRoll && !this.pendingReward && this.state.status !== 'won' && this.state.status !== 'lost'; }
   craftSuper(type: TowerType): boolean {
     if (!this.canManageTowers()) return false;
@@ -178,9 +212,13 @@ export class GameSimulation {
   private tickSuperUnits(deltaMs: number): void {
     if (!this.currentWaveActive) return;
     for(const unit of this.state.board){
-      if(!getUnitDefinition(unit.definitionId).superUnique)continue;
+      const definition = getUnitDefinition(unit.definitionId);
+      if(!definition.superUnique)continue;
       const before=unit.superElapsedMs??0,after=before+deltaMs;
-      if(!unit.superStarted||Math.floor(before/8000)!==Math.floor(after/8000))this.events.push({type:'superSkill',skill:'berserk',sourceId:unit.instanceId,at:{x:unit.x,y:unit.y}});
+      const cycle = definition.ultimate ? 10000 : 8000;
+      if (definition.ultimate) unit.ultimateCooldownMs = Math.max(0, (unit.ultimateCooldownMs ?? 0) - deltaMs);
+      if(!unit.superStarted||Math.floor(before/cycle)!==Math.floor(after/cycle))this.events.push({type:'superSkill',skill:'berserk',sourceId:unit.instanceId,at:{x:unit.x,y:unit.y}});
+      if(definition.ultimate&&!unit.superStarted)this.events.push({type:'superSkill',skill:'blessing',sourceId:unit.instanceId,at:{x:unit.x,y:unit.y},targets:this.state.board.map(u=>({x:u.x,y:u.y}))});
       if(unit.definitionId==='super-priest'&&(!unit.superStarted||Math.floor(before/15000)!==Math.floor(after/15000)))this.events.push({type:'superSkill',skill:'blessing',sourceId:unit.instanceId,at:{x:unit.x,y:unit.y},targets:this.state.board.map(u=>({x:u.x,y:u.y}))});
       unit.superElapsedMs=after;unit.superStarted=true;
     }
@@ -190,7 +228,7 @@ export class GameSimulation {
     if (!unit) return null;
     const definition = getUnitDefinition(unit.definitionId);
     const stats = getEffectiveUnitStats(definition, getUniqueUnitLevel(this.meta, definition.id));
-    const aura=shared?.aura??this.getSuperAura(), berserk=this.isSuperBerserk(unit)?2:1;
+    const aura=shared?.aura??this.getSuperAura(), berserk=this.isSuperBerserk(unit)?(definition.ultimate?3:2):1;
     const weapon=unit.items?.find(i=>i.kind==='weapon'),boots=unit.items?.find(i=>i.kind==='boots');
     const equipmentAttack=weapon?200+weapon.bonus:0;
     const roleStat = definition.role === 'single' ? 'singleDamage' : definition.role === 'area' ? 'areaDamage' : 'supportDamage';
@@ -742,6 +780,19 @@ export class GameSimulation {
       const definition = getUnitDefinition(unit.definitionId);
       const uniqueLevel = getUniqueUnitLevel(this.meta, definition.id);
       const stats = this.getTowerCombatStats(unitIndex,shared)!;
+      if (definition.ultimate && this.currentWaveActive && (unit.ultimateCooldownMs ?? 0) <= 0) {
+        const targets = this.enemies.filter(e => e.hp > 0);
+        if (targets.length) {
+          unit.ultimateCooldownMs = 12000;
+          for (const target of targets) {
+            const amount = Math.round(stats.attack * 12 * attackBuff * (1 + uniqueSkillPowerBonus) * (target.isBoss ? 2 * (1 + bossDamageBonus) : 1));
+            target.hp -= amount;
+            target.lastHitByDefinitionId = definition.id;
+            this.events.push({ type: 'damage', targetId: target.id, at: getPathPosition(target.progress), amount, critical: false, rarityTier: 9 });
+          }
+          this.events.push({ type: 'superSkill', skill: 'heaven-split', sourceId: unit.instanceId, at: { x: unit.x, y: unit.y }, targets: targets.map(e => getPathPosition(e.progress)) });
+        }
+      }
       const abilityStats = definition.uniqueAbility ? getUniqueAbilityStats(definition.uniqueAbility, uniqueLevel) : null;
       const berserkStats = abilityStats?.ability === "berserk" ? abilityStats : null;
       const multishotStats = abilityStats?.ability === "multishot" ? abilityStats : null;

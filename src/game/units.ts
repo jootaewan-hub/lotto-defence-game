@@ -1,4 +1,5 @@
 import { RARITIES } from "./rarities";
+import { ULTIMATE_ID, ULTIMATE_SKILLS } from './ultimate';
 import type { MetaProgress, RarityId, UnitDefinition, UnitRole, TowerType } from "./types";
 
 const roleBlueprints: Record<
@@ -121,11 +122,13 @@ for (const [towerType, name, role, attack, attackSpeed, range] of [
 ] as const) {
   UNIT_DEFINITIONS.push({id: `super-${towerType}`, name, towerType, superUnique: true, rarity: 'immortal', role, attack, attackSpeed, range, criticalChance: 0.2, attackType: '슈퍼유니크 전용 공격', skill: `${SUPER_SKILLS[towerType]} / 광폭화: 5초간 공격력·공격속도 2배, 종료 후 3초 대기`});
 }
+UNIT_DEFINITIONS.push({ id: ULTIMATE_ID, name: '무극신', ultimate: true, superUnique: true, towerType: 'warrior', rarity: 'immortal', role: 'single', attack: 1600, attackSpeed: 850, range: 260, criticalChance: .25, attackType: '무극 검기 · 5명 동시 타격', skill: ULTIMATE_SKILLS.map(s => `${s.name}: ${s.description}`).join(' / ') });
 const UNITS_BY_ID = new Map(UNIT_DEFINITIONS.map(unit => [unit.id, unit]));
 export function getTowerType(unit: UnitDefinition): TowerType {
   return unit.towerType ?? (unit.uniqueAbility === 'multishot' ? 'archer' : unit.role === 'single' ? 'warrior' : unit.role === 'area' ? 'mage' : 'priest');
 }
 export function getUnitPortrait(unit: UnitDefinition): string {
+  if (unit.ultimate) return ULTIMATE_ID;
   if (unit.superUnique) return `super-${getTowerType(unit)}`;
   if (unit.uniqueAbility) return ({multishot:'storm-archer',poison:'plague-warlock',slow:'time-mage',freeze:'frost-witch',berserk:'berserker'})[unit.uniqueAbility];
   const stage = RARITIES.findIndex(r => r.id === unit.rarity) + 1;

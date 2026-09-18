@@ -2255,3 +2255,16 @@ dialog h2 {
 .awakening-preview p { font-size:11px; color:#a7bab4; }
 @media(max-width:600px) { .evolution-gallery-grid { grid-template-columns:repeat(3,minmax(0,1fr)); } #selected-unit > .unit-art { width:62px; height:62px; } .header-tools { flex-wrap:wrap; } }
 .evolved-sprite { position:absolute; inset:0; background-size:400% 200%; background-repeat:no-repeat; z-index:2; filter:drop-shadow(0 2px 3px #07121c); }
+.ultimate-art img { width:100%; height:100%; object-fit:contain; filter:drop-shadow(0 0 8px #ecd99255); }
+.ultimate-forge { margin:24px 0; padding:20px; border:1px solid #decf93; border-radius:14px; background:radial-gradient(ellipse at top,#b69e3929,transparent 75%),#0d1722; }
+.ultimate-heading { display:flex; gap:18px; align-items:center; }
+.ultimate-heading .unit-art { width:128px; height:128px; }
+.ultimate-heading small { color:#d7c384; font-size:11px; }
+.ultimate-heading h3 { color:#fff0bf; font-size:30px; margin:4px 0; }
+.ultimate-heading p,.ultimate-skill-list p { color:#bfcacb; font-size:11px; line-height:1.8; }
+.ultimate-skill-list b { color:#e7d99e; }
+.ultimate-forge>button { width:100%; padding:12px; border:1px solid #d7bc71; background:#d7bc71; color:#132028; border-radius:7px; font-weight:700; }
+.ultimate-forge>button:disabled { opacity:.45; }
+#selected-unit .ultimate-skill-list { max-height:145px; overflow:auto; }
+#selected-unit .ultimate-skill-list p { font-size:10px; line-height:1.5; margin:6px 0; }
+@media(max-width:600px){ .ultimate-heading .unit-art{width:90px;height:90px}.ultimate-forge{padding:14px}.ultimate-heading h3{font-size:25px} }

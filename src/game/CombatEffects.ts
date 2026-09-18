@@ -176,12 +176,17 @@ export class CombatEffects {
     }
     private drawSuperBurst(event:Extract<SimulationEvent,{type:'superSkill'}>,age:number){
         const t=Math.min(1,age/850),alpha=1-t,g=this.graphics;
-        const color=event.skill==='blessing'?0xc6acff:event.skill==='inferno'?0xff8454:event.skill==='dragon-ring'||event.skill==='dragon-magic'?0xffda78:0xffb5a0;
-        const p=project(event.at),global=event.skill==='inferno'||event.skill==='dragon-ring';
+        const color=event.skill==='heaven-split'?0xffe6a3:event.skill==='blessing'?0xc6acff:event.skill==='inferno'?0xff8454:event.skill==='dragon-ring'||event.skill==='dragon-magic'?0xffda78:0xffb5a0;
+        const p=project(event.at),global=event.skill==='heaven-split'||event.skill==='inferno'||event.skill==='dragon-ring';
         const center=global?{x:390,y:245}:p,radius=(global?330:80)*Math.sqrt(t);
         g.fillStyle(color,alpha*(global?0.035:0.07));g.fillCircle(center.x,center.y,radius);
         g.lineStyle(global?3:2,color,alpha*0.7);g.strokeCircle(center.x,center.y,radius);
         g.lineStyle(1,0xfff0ca,alpha*0.55);g.strokeCircle(center.x,center.y,radius*.8);
+        if(event.skill==='heaven-split'){
+            g.lineStyle(5,0xfff4dc,alpha*.8);g.lineBetween(center.x-radius,center.y-radius*.5,center.x+radius,center.y+radius*.5);
+            g.lineStyle(8,0x10152b,alpha*.7);g.lineBetween(center.x-radius,center.y+radius*.5,center.x+radius,center.y-radius*.5);
+            g.lineStyle(1.5,0xffdc8d,alpha);g.strokeEllipse(center.x,center.y,radius*1.6,radius*.65);
+        }
         for(let k=0;k<8;k++){const angle=k*Math.PI/4+(this.reduced?0:t);const x=center.x+Math.cos(angle)*radius,y=center.y+Math.sin(angle)*radius;this.star({x,y},(global?14:7)*alpha,color,alpha,angle);}
         for(const target of (event.targets??[]).slice(0,24)){
             const end=project(target);

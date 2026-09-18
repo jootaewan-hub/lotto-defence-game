@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="320" viewBox="0 0 320 320">
+<defs>
+<linearGradient id="gold" x2="1" y2="1"><stop stop-color="#fff8dc"/><stop offset=".3" stop-color="#e8cf7b"/><stop offset=".65" stop-color="#8c6229"/><stop offset="1" stop-color="#ffe8a0"/></linearGradient>
+<linearGradient id="robe" x2="1" y2="1"><stop stop-color="#faf7eb"/><stop offset=".42" stop-color="#c5d3de"/><stop offset=".44" stop-color="#283245"/><stop offset="1" stop-color="#070b17"/></linearGradient>
+<linearGradient id="steel" x2="1" y2="1"><stop stop-color="#f4fcff"/><stop offset=".45" stop-color="#bed4e4"/><stop offset=".5" stop-color="#5d6d8b"/><stop offset="1" stop-color="#101628"/></linearGradient>
+<radialGradient id="aura"><stop stop-color="#fff3b8" stop-opacity=".32"/><stop offset=".6" stop-color="#d6b665" stop-opacity=".13"/><stop offset="1" stop-color="#ffd993" stop-opacity="0"/></radialGradient>
+<g id="blade"><path d="M0 -58L7 -33 4 16 12 22 3 25 0 39 -3 25 -12 22 -4 16 -7 -33Z" fill="url(#steel)" stroke="#f6d98c" stroke-width="1.4"/><path d="M0 -52V16" stroke="#fff" stroke-width="1.4"/><path d="M-11 22H11M0 26V36" stroke="#e9c778" stroke-width="3"/></g>
+</defs>
+<circle cx="160" cy="151" r="145" fill="url(#aura)"/>
+<g fill="none" stroke="url(#gold)"><circle cx="160" cy="139" r="98" stroke-width="2"/><circle cx="160" cy="139" r="89" stroke-width=".8"/><circle cx="160" cy="139" r="103" stroke-dasharray="12 5 2 5" stroke-width="3"/><path d="M160 24L264 139 160 254 56 139Z" opacity=".55"/></g>
+<g opacity=".95"><use href="#blade" transform="translate(71 112) rotate(-38) scale(.7)"/><use href="#blade" transform="translate(249 112) rotate(38) scale(.7)"/><use href="#blade" transform="translate(55 179) rotate(-70) scale(.65)"/><use href="#blade" transform="translate(265 179) rotate(70) scale(.65)"/><use href="#blade" transform="translate(96 229) rotate(-130) scale(.55)"/><use href="#blade" transform="translate(224 229) rotate(130) scale(.55)"/></g>
+<ellipse cx="160" cy="286" rx="78" ry="14" fill="#040815" opacity=".4"/>
+<g stroke="url(#gold)" stroke-width="1.4"><path d="M92 273Q63 256 56 228Q87 235 108 256Q92 222 112 205Q137 225 140 265Q157 229 160 226Q178 245 180 269Q186 222 208 205Q227 228 213 257Q246 228 267 228Q252 268 226 273Q186 301 160 297Q118 295 92 273Z" fill="#25253e"/><path d="M73 250Q116 261 160 290Q205 262 250 251M112 223Q131 255 160 290Q187 254 207 223" fill="none"/></g>
+<path d="M126 111Q101 133 98 179L65 261 114 248 135 278 161 262 191 279 208 249 251 261 222 180Q216 129 190 110Z" fill="url(#robe)" stroke="#e9d297" stroke-width="2"/>
+<path d="M123 142L102 229 83 249 121 237 147 267 160 183 180 268 202 238 236 250 214 220 194 141" fill="none" stroke="url(#gold)" stroke-width="3"/>
+<path d="M131 120L160 181 190 120 185 198 160 218 136 198Z" fill="#101625" stroke="url(#gold)" stroke-width="2"/>
+<path d="M141 151L160 166 179 151 173 191 160 202 147 190Z" fill="url(#steel)" stroke="#f4d793"/>
+<path d="M112 117L87 133 81 155 114 153 136 134ZM208 117L233 133 239 155 206 153 184 134Z" fill="url(#steel)" stroke="url(#gold)" stroke-width="2"/>
+<path d="M94 130L112 110 131 118 112 139ZM226 130L208 110 189 118 208 139Z" fill="#fff5d0" stroke="#997332"/>
+<path d="M117 150L101 184 134 203 146 187 124 175 133 150M203 150L219 184 186 203 174 187 196 175 187 150" fill="url(#robe)" stroke="url(#gold)" stroke-width="2"/>
+<path d="M139 201L150 182 171 183 182 201 173 212 148 211Z" fill="#f0d5b7" stroke="#4b3540"/>
+<path d="M137 80Q129 63 146 55Q163 43 180 60Q193 72 183 88L181 109Q158 132 140 108Z" fill="#edddc7" stroke="#3a2b3a" stroke-width="2"/>
+<path d="M139 77Q141 100 127 123L114 136Q121 106 125 86Q119 60 140 48Q167 33 189 54Q203 67 194 91Q198 112 207 131L186 119Q176 91 182 72L167 77 160 60 153 80Z" fill="url(#steel)" stroke="#d4dbe0" stroke-width="1.4"/>
+<path d="M144 89L154 91M167 91L177 89" stroke="#1c3047" stroke-width="3"/><path d="M148 90H153M168 90H173" stroke="#fff1b4" stroke-width="2"/><path d="M154 107Q160 110 167 106" stroke="#936a6d" fill="none"/>
+<path d="M132 60L130 38 145 48 160 20 175 48 192 36 187 61 160 69Z" fill="url(#gold)" stroke="#fff2c6" stroke-width="1.5"/>
+<path d="M160 31L166 50 160 61 154 50Z" fill="#e7f6ff" stroke="#45647b"/>
+<use href="#blade" transform="translate(160 231) rotate(180) scale(.9)"/>
+<g transform="translate(160 160)"><circle r="14" fill="#e9eee8" stroke="url(#gold)" stroke-width="2"/><path d="M0 -14A7 7 0 010 0A7 7 0 000 14A14 14 0 010 -14" fill="#101624"/><circle cy="-7" r="2.5" fill="#f8f4e0"/><circle cy="7" r="2.5" fill="#182131"/></g>
+<g fill="#fff0b7"><path d="M42 80l3 7 7 3 -7 3 -3 7 -3 -7 -7 -3 7 -3Z"/><path d="M281 72l2 6 6 2 -6 2 -2 6 -2 -6 -6 -2 6 -2Z"/><path d="M159 304l3 -6 3 6 -3 7Z"/></g>
+</svg>
