@@ -1,3 +1,6 @@
+import { BATTLE_THEMES } from './game/battleThemes';
+import { unitArtMarkup, evolutionPathMarkup, evolutionGalleryMarkup } from './evolutionUi';
+import { getEvolutionVisual } from './game/evolutionVisuals';
 import { superForgeMarkup, dragonShopMarkup } from './superUi';
 import { MAX_TOWERS, TOWER_TYPES, TOWER_LABELS } from './game/superUnits';
 import type { TowerType, DragonItemKind } from './game/types';
@@ -8,7 +11,7 @@ import type { GameSimulation, SimulationEvent } from './game/simulation';
 import { getRarity } from './game/rarities';
 import { MAX_WAVES, purchaseSkill, skillTracks, skillTree } from './game/systems';
 import { saveMetaProgress } from './game/storage';
-import { getUniqueUnitLevel, getUnitDefinition, getUnitPortrait, getTowerType, isUniqueUnit } from './game/units';
+import { getUniqueUnitLevel, getUnitDefinition, getTowerType, isUniqueUnit } from './game/units';
 export interface UiHandle {
     setScene(scene: GameScene): void;
     render(): void;
@@ -21,14 +24,13 @@ const icon = (name: string) => {
     const paths: Record<string, string> = { moon: 'M20 15.2A8.7 8.7 0 0 1 8.8 4a8.7 8.7 0 1 0 11.2 11.2Z', shield: 'M12 3 4 6v6c0 5 8 9 8 9s8-4 8-9V6Z', diamond: 'm12 3 8 9-8 9-8-9Z', swords: 'm4 3 16 17m0-17L4 20M3 15l6 6m6-18 6 6', snow: 'M12 2v20M3.3 7l17.4 10M3.3 17 20.7 7M9 4l3 3 3-3M9 20l3-3 3 3', star: 'm12 2 2.5 7.5L22 12l-7.5 2.5L12 22l-2.5-7.5L2 12l7.5-2.5Z', play: 'm8 4 12 8-12 8Z', pause: 'M8 5v14M16 5v14', sound: 'm4 9 4 0 5-4v14l-5-4H4ZM17 8c3 2 3 6 0 8', book: 'M12 5C8 2 3 4 3 4v15s5-2 9 1c4-3 9-1 9-1V4s-5-2-9 1Zm0 0v15', coin: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Zm0 4v10m-3-8h5c3 0 3 3 0 3h-4c-3 0-3 3 0 3h5' };
     return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${(paths[name] || paths.star).split('~').map(d => `<path d="${d}"/>`).join('')}</svg>`;
 };
-function portrait(id: string) { return getUnitPortrait(getUnitDefinition(id)); }
 export function createUi(sim: GameSimulation): UiHandle {
     const app = document.querySelector<HTMLDivElement>('#app')!;
     app.innerHTML = `<main class="shell">
-  <header class="masthead"><a class="brand" href="./" aria-label="달빛 수호대 홈"><span class="brand-sigil">${icon('moon')}</span><span><b>달빛 수호대</b><small>운명을 뽑고, 성채를 지켜라</small></span></a><div class="header-tools"><span class="best-record" id="best-record"></span><button class="icon-button" id="sound-button" aria-label="소리 켜기" title="소리 켜기">${icon('sound')}</button><button id="help-button" class="quiet-button">${icon('book')} 플레이 가이드</button></div></header>
-  <section class="campaign-heading"><div><span class="chapter-label"><i></i> 첫 번째 원정</span><h1>잊혀진 숲의 성채</h1><p>끝없는 어둠 속, 마지막 달빛을 지켜주세요.</p></div><div class="chapter-mark">I<span>Moonwood</span></div></section>
+  <header class="masthead"><a class="brand" href="./" aria-label="달빛 수호대 홈"><span class="brand-sigil">${icon('moon')}</span><span><b>달빛 수호대</b><small>운명을 뽑고, 성채를 지켜라</small></span></a><div class="header-tools"><span class="best-record" id="best-record"></span><button class="icon-button" id="sound-button" aria-label="소리 켜기" title="소리 켜기">${icon('sound')}</button><button id="evolution-button" class="quiet-button">${icon('star')} 진화 도감</button><button id="help-button" class="quiet-button">${icon('book')} 플레이 가이드</button></div></header>
+  <section class="campaign-heading"><div><span class="chapter-label"><i></i> 첫 번째 원정</span><h1 id="battle-title">잊혀진 숲의 성채</h1><p id="battle-subtitle">끝없는 어둠 속, 마지막 달빛을 지켜주세요.</p></div><div class="chapter-mark">I<span>Moonwood</span></div></section>
   <section class="game-layout">
-   <div class="battle-column"><div class="battle-hud"><div class="wave-stat"><span class="stat-label">현재 웨이브</span><strong><span id="wave-count">00</span><small> / ${MAX_WAVES}</small></strong></div><div class="health-stat"><div><span>${icon('shield')} 성채 내구도</span><b id="hp-count"></b></div><div class="health-track"><i id="hp-bar"></i></div></div><div class="gold-stat">${icon('coin')}<div><span class="stat-label">보유 골드</span><strong id="gold-count"></strong></div></div></div>
+   <div class="battle-column"><div class="battle-hud"><div class="wave-stat"><span id="difficulty-label" class="stat-label">보통 · 현재 웨이브</span><strong><span id="wave-count">00</span><small> / ${MAX_WAVES}</small></strong></div><div class="health-stat"><div><span>${icon('shield')} 성채 내구도</span><b id="hp-count"></b></div><div class="health-track"><i id="hp-bar"></i></div></div><div class="gold-stat">${icon('coin')}<div><span class="stat-label">보유 골드</span><strong id="gold-count"></strong></div></div></div>
     <div class="arena-wrap"><div id="game-root"></div><div class="arena-topline"><span id="phase-chip" class="phase-chip"></span><span id="timer-chip"></span></div><div class="arena-caption"><span class="live-dot"></span> 달빛의 정원 <small>방어 구역</small></div><div id="toast" class="toast" role="status" aria-live="polite"></div><div id="pause-overlay" class="pause-overlay hidden"><span>${icon('pause')}</span><h2>잠시, 숨 고르기</h2><p>계속하려면 일시정지 버튼 또는 Space</p></div></div>
     <div class="battle-toolbar"><div class="speed-controls"><button id="pause-button" class="icon-button" aria-label="일시정지">${icon('pause')}</button><span class="divider"></span>${[1, 2, 3, 5, 10].map(s => `<button data-speed="${s}" class="speed-button ${s === 1 ? 'active' : ''} ${s === 10 ? 'operator-speed' : ''}" aria-label="${s}배속${s === 10 ? ' 운영자용' : ''}" title="${s === 10 ? '운영자용 고속 테스트' : `${s}배속`}">${s}×${s === 10 ? '<small>운영자</small>' : ''}</button>`).join('')}</div><span class="kill-count">처치 <b id="kill-count">0</b></span><button id="wave-button" class="wave-button">${icon('play')} 원정 시작</button></div>
     <div class="journey-strip"><span>원정의 이정표</span><div id="milestones">${[1, 20, 40, 60, 80, 100, 120].map(n => `<span data-milestone="${n}"><i>${n === 1 ? '·' : icon('diamond')}</i><small>${n}</small></span>`).join('')}</div><b>${MAX_WAVES}<br><small>최종 방어</small></b></div>
@@ -71,7 +73,7 @@ export function createUi(sim: GameSimulation): UiHandle {
     }
     catch { /* Audio is optional. */ } }
     function open(kind: string, html: string) { dialogKind = kind; q('dialog-content').innerHTML = html; dialog.scrollTop = 0; if (!dialog.open)
-        dialog.showModal(); }
+        dialog.showModal(); dialog.scrollTop = 0; }
     function close() { window.clearTimeout(autoCloseTimer); stopDice?.(); stopDice = undefined; dialog.close(); dialogKind = ''; }
     function heading(label: string, title: string, desc: string) { return `<span class="dialog-eyebrow">${label}</span><h2 id="dialog-title">${title}</h2><p class="dialog-description">${desc}</p>`; }
     function toast(text: string) { q('toast').textContent = text; q('toast').classList.add('show'); window.clearTimeout(toastTimer); toastTimer = window.setTimeout(() => q('toast').classList.remove('show'), 2600); }
@@ -107,7 +109,7 @@ export function createUi(sim: GameSimulation): UiHandle {
         const prompt = sim.requestMerge(selected ?? undefined);
         if (!prompt)
             return;
-        open('merge', heading('수호자의 각성', '다음 수호자를 선택하세요', '같은 수호자 3명이 한 단계 높은 수호자로 다시 태어납니다.') + `<div class="choice-grid">${prompt.candidates.map(d => `<button data-merge="${d.id}" class="choice"><img src="${art}${portrait(d.id)}.png" alt=""><small style="color:${getRarity(d.rarity).color}">${getRarity(d.rarity).label}</small><h3>${d.name}</h3><p>${d.skill}</p></button>`).join('')}</div><button data-close class="quiet-button">돌아가기</button>`);
+        open('merge', heading('수호자의 각성', '다음 수호자를 선택하세요', '같은 수호자 3명이 한 단계 높은 수호자로 다시 태어납니다.') + `<div class="choice-grid">${prompt.candidates.map(d => `<button data-merge="${d.id}" class="choice">${unitArtMarkup(d)}<small style="color:${getRarity(d.rarity).color}">${getEvolutionVisual(d).label} · ${getRarity(d.rarity).label}</small><h3>${d.name}</h3><p>${d.skill}</p></button>`).join('')}</div><button data-close class="quiet-button">돌아가기</button>`);
     });
     button('frost-button', () => { if (sim.castFrost())
         scene?.pulseFrost(); });
@@ -123,7 +125,8 @@ export function createUi(sim: GameSimulation): UiHandle {
     });
     button('pause-button', () => paused = !paused);
     button('sound-button', () => { muted = !muted; q('sound-button').classList.toggle('enabled', !muted); q('sound-button').setAttribute('aria-label', muted ? '소리 켜기' : '소리 끄기'); q('sound-button').title = muted ? '소리 켜기' : '소리 끄기'; });
-    button('help-button', () => open('help', heading('플레이 가이드', '운명은 뽑고, 전술은 고르세요', '소환 · 배치 · 합성, 세 가지로 시작하는 달빛의 전투') + `<div class="guide-list"><article><b>01</b><div><h3>수호자를 모으세요</h3><p>시작 수호자 3명이 배치되어 있습니다. 골드로 동료를 소환하고 원정 시작을 누르세요.</p></div></article><article><b>02</b><div><h3>길목을 지키세요</h3><p>수호자를 드래그해 이동합니다. 클릭하면 사거리가 보입니다. 기사·마법사·사제를 함께 편성하면 공격력 +15%.</p></div></article><article><b>03</b><div><h3>합성하고, 결계를 펼치세요</h3><p>같은 수호자 3명을 합성하면 상위 등급을 직접 고릅니다. 달빛 결계는 현재 적을 3초간 얼립니다. 기본 재사용 24초. 선택한 타워는 골드로 공격력 룰렛 또는 공격속도 주사위(+1~20%)를 강화합니다. 합성 시 수치가 계승됩니다. 슈퍼유니크 각성에는 같은 유형 유니크 1명·전설/영웅/희귀 각 3명과 10,000G가 필요합니다.</p></div></article><article><b>04</b><div><h3>120웨이브를 버티세요</h3><p>적은 순환 경로를 돌고, 제한시간 종료 시 생존한 일반 적 6명당 체력 1, 보스당 5를 잃습니다. 5웨이브마다 보스가 등장합니다. 5웨이브마다 26종 중 무작위 축복 3개를 제시하며, 하나를 골라 주사위로 강화량을 정합니다. 실패해도 성장 조각은 남습니다.</p></div></article></div><button data-close class="dialog-primary">이제 지킬 준비가 됐어요</button>`));
+    button('evolution-button', () => open('evolution', evolutionGalleryMarkup()));
+    button('help-button', () => open('help', heading('플레이 가이드', '운명은 뽑고, 전술은 고르세요', '소환 · 배치 · 합성, 세 가지로 시작하는 달빛의 전투') + `<div class="guide-list"><article><b>01</b><div><h3>수호자를 모으세요</h3><p>시작 수호자 3명이 배치되어 있습니다. 골드로 동료를 소환하고 원정 시작을 누르세요.</p></div></article><article><b>02</b><div><h3>길목을 지키세요</h3><p>수호자를 드래그해 이동합니다. 클릭하면 사거리가 보입니다. 기사·마법사·사제를 함께 편성하면 공격력 +15%.</p></div></article><article><b>03</b><div><h3>합성하고, 결계를 펼치세요</h3><p>같은 수호자 3명을 합성하면 상위 등급을 직접 고릅니다. 달빛 결계는 현재 적을 3초간 얼립니다. 기본 재사용 24초. 선택한 타워는 골드로 공격력 룰렛 또는 공격속도 주사위(+1~20%)를 강화합니다. 합성 시 수치가 계승됩니다. 슈퍼유니크 각성에는 같은 유형 유니크 1명·전설/영웅/에픽 각 3명과 10,000G가 필요합니다.</p></div></article><article><b>04</b><div><h3>네 난이도의 120웨이브를 돌파하세요</h3><p>보통 → 나이트메어 → 헬 → Insane 순서로 각각 120웨이브를 진행합니다. 난이도 전환 시 수호대와 강화가 유지됩니다. 보통 대비 적 체력·방어력은 나이트메어 +50%, 헬 +150%, Insane +300%이며 Insane은 등장 수가 2배입니다. 최대 수호대는 200명입니다. 적은 순환 경로를 돌고, 제한시간 종료 시 생존한 일반 적 6명당 체력 1, 보스당 5를 잃습니다. 5웨이브마다 보스가 등장합니다. 5웨이브마다 26종 중 무작위 축복 3개를 제시하며, 하나를 골라 주사위로 강화량을 정합니다. 실패해도 성장 조각은 남습니다.</p></div></article></div><button data-close class="dialog-primary">이제 지킬 준비가 됐어요</button>`));
     let branch = skillTracks[0]!.id;
     function showSkills() {
         open('skills', heading('성장 조각은 원정이 끝나도 유지됩니다', '수호대의 유산', `보유 조각 ${sim.meta.growthShards} · 최고 기록 ${sim.meta.highestWave}웨이브`) + `<div class="skill-tabs">${skillTracks.map(t => `<button data-branch="${t.id}" class="${branch === t.id ? 'active' : ''}">${t.label}</button>`).join('')}</div><div class="skill-list">${skillTree.filter(n => n.branch === branch).map(n => { const owned = sim.meta.unlockedSkills.includes(n.id), locked = !!n.prerequisite && !sim.meta.unlockedSkills.includes(n.prerequisite); return `<button data-skill="${n.id}" ${owned || locked || sim.meta.growthShards < n.cost ? 'disabled' : ''}><b>${n.tier}</b><span>${n.description}</span><small>${owned ? '해금 완료' : `${n.cost} 조각`}</small></button>`; }).join('')}</div><button data-close class="dialog-primary">전장으로 돌아가기</button>`);
@@ -204,6 +207,11 @@ export function createUi(sim: GameSimulation): UiHandle {
     } });
     function render() {
         const s = sim.state, ended = s.status === 'won' || s.status === 'lost';
+        const theme = BATTLE_THEMES[s.difficulty];
+        q('battle-title').textContent = theme.title;
+        q('battle-title').style.color = theme.accent;
+        q('battle-subtitle').textContent = theme.subtitle;
+        q('difficulty-label').textContent = `${sim.difficulty.label} · 현재 웨이브`;
         q('wave-count').textContent = String(s.wave).padStart(2, '0');
         q('hp-count').textContent = `${s.baseHealth} / ${s.maxBaseHealth}`;
         q('hp-bar').style.width = `${100 * s.baseHealth / s.maxBaseHealth}%`;
@@ -232,7 +240,7 @@ export function createUi(sim: GameSimulation): UiHandle {
         const unit = selected === null ? null : s.board[selected];
         if (unit) {
             const d = getUnitDefinition(unit.definitionId), r = getRarity(d.rarity), stats = sim.getTowerCombatStats(selected!)!;
-            q('selected-unit').innerHTML = `<img src="${art}${portrait(d.id)}.png" alt=""><div><small style="color:${d.superUnique?'#ebd49e':r.color}">${d.superUnique?'유일슈퍼유니크':r.label} 수호자</small><h3>${d.name}${isUniqueUnit(d) ? ` Lv.${getUniqueUnitLevel(sim.meta, d.id)}` : ''}</h3><p>공격 ${stats.baseAttack} <em class="stat-gain">(+${(stats.attack-stats.baseAttack).toFixed(1)})</em> = ${stats.attack.toFixed(1)}</p><p>공속 ${(1000/stats.attackSpeed).toFixed(2)}/초 · ${d.superUnique?`장비 ${unit.items?.length??0}/3`: `사거리 ${Math.round(stats.range)}`}</p><p>${d.superUnique?(sim.isSuperBerserk(unit)?'광폭화 활성 · 공격/공속 2배':'광폭화 대기 · 자동 시전'):d.role === 'single' ? '선두 적 집중 공격' : d.role === 'area' ? '주변 적 광역 공격' : '아군 공격속도 보조'}</p></div>`;
+            q('selected-unit').innerHTML = `${unitArtMarkup(d)}<div><small style="color:${d.superUnique?'#ebd49e':r.color}">${getEvolutionVisual(d).label} · ${d.superUnique?'유일슈퍼유니크':r.label} 수호자</small><h3>${d.name}${isUniqueUnit(d) ? ` Lv.${getUniqueUnitLevel(sim.meta, d.id)}` : ''}</h3><p class="evolution-level">${isUniqueUnit(d) ? `스킬 진화 ${getEvolutionVisual(d, getUniqueUnitLevel(sim.meta, d.id)).skillStage}단계 · 5레벨마다 성장` : `다음 진화: ${getEvolutionVisual(d).stage < 9 ? `${getEvolutionVisual(d).stage + 1}단계` : '최고 등급'}`}</p><p>공격 ${stats.baseAttack} <em class="stat-gain">(+${(stats.attack-stats.baseAttack).toFixed(1)})</em> = ${stats.attack.toFixed(1)}</p><p>공속 ${(1000/stats.attackSpeed).toFixed(2)}/초 · ${d.superUnique?`장비 ${unit.items?.length??0}/3`: `사거리 ${Math.round(stats.range)}`}</p><p>${d.superUnique?(sim.isSuperBerserk(unit)?'광폭화 활성 · 공격/공속 2배':'광폭화 대기 · 자동 시전'):d.role === 'single' ? '선두 적 집중 공격' : d.role === 'area' ? '주변 적 광역 공격' : '아군 공격속도 보조'}</p>${evolutionPathMarkup(d)}</div>`;
         }
         else
             q('selected-unit').innerHTML = `<span class="empty-emblem">${icon('shield')}</span><div><small>수호자 정보</small><h3>함께할 수호자를 선택하세요</h3><p>전장 또는 아래 카드를 클릭하세요.</p></div>`;
@@ -258,7 +266,7 @@ export function createUi(sim: GameSimulation): UiHandle {
         if (key !== rosterKey) {
             rosterKey = key;
             const mergeable = sim.getMergeableSlots();
-            q('roster').innerHTML = s.board.length ? s.board.map((u, i) => { const d = getUnitDefinition(u.definitionId), r = getRarity(d.rarity), cardStats=sim.getTowerCombatStats(i)!; return `<button data-unit="${i}" class="unit-card ${d.superUnique?'super-card':''} ${selected === i ? 'selected' : ''}" style="--rarity:${r.color}" aria-label="${d.name} 선택" aria-pressed="${selected === i}"><span class="unit-rarity">${d.superUnique?'슈퍼유니크':r.label}${isUniqueUnit(d) ? ` · Lv.${getUniqueUnitLevel(sim.meta, d.id)}` : ''}</span><img src="${art}${portrait(d.id)}.png" alt=""><b>${d.name.replace(r.label + ' ', '')}</b><small class="card-attack">공격 ${cardStats.baseAttack} <em>(+${(cardStats.attack-cardStats.baseAttack).toFixed(1)})</em></small><small>${u.attackUpgradePercent ? `강화 +${u.attackUpgradePercent}%` : mergeable.has(i) ? '합성 가능' : d.role === 'single' ? '집중 공격' : d.role === 'area' ? '광역 공격' : '공격 보조'}</small></button>`; }).join('') : `<p class="empty-roster">수호자를 소환해 방어선을 만드세요.</p>`;
+            q('roster').innerHTML = s.board.length ? s.board.map((u, i) => { const d = getUnitDefinition(u.definitionId), r = getRarity(d.rarity), cardStats=sim.getTowerCombatStats(i)!; return `<button data-unit="${i}" class="unit-card ${d.superUnique?'super-card':''} ${selected === i ? 'selected' : ''}" style="--rarity:${r.color}" aria-label="${d.name} 선택" aria-pressed="${selected === i}"><span class="unit-rarity">${d.superUnique?'★ 최종 각성':`${getEvolutionVisual(d).stage}단계 · ${r.label}`}${isUniqueUnit(d) ? ` · Lv.${getUniqueUnitLevel(sim.meta, d.id)}` : ''}</span>${unitArtMarkup(d)}<b>${d.name.replace(r.label + ' ', '')}</b><small class="card-attack">공격 ${cardStats.baseAttack} <em>(+${(cardStats.attack-cardStats.baseAttack).toFixed(1)})</em></small><small>${u.attackUpgradePercent ? `강화 +${u.attackUpgradePercent}%` : mergeable.has(i) ? '합성 가능' : d.role === 'single' ? '집중 공격' : d.role === 'area' ? '광역 공격' : '공격 보조'}</small></button>`; }).join('') : `<p class="empty-roster">수호자를 소환해 방어선을 만드세요.</p>`;
         }
         document.querySelectorAll<HTMLElement>('[data-milestone]').forEach(el => el.classList.toggle('reached', s.wave >= Number(el.dataset.milestone)));
         const next = JSON.stringify(sim.meta);
@@ -279,7 +287,7 @@ export function createUi(sim: GameSimulation): UiHandle {
                 tone(true);
             }
             if (e.type === 'runEnded') {
-                open('result', heading(e.status === 'won' ? '새벽이 밝았습니다' : '아직, 이야기는 끝나지 않았습니다', e.status === 'won' ? '성채를 지켜냈습니다' : '다시 일어설 시간', `도달 웨이브 ${sim.state.wave} · 처치 ${sim.state.defeatedEnemies} · 획득 조각 ${e.growthShardsAwarded}`) + `<div class="result-sigil">${icon('moon')}</div><p class="dialog-description">성장 조각으로 수호대를 강화하고, 더 먼 곳으로 나아가세요.</p><button data-restart class="dialog-primary">새로운 원정 준비</button>`);
+                open('result', heading(e.status === 'won' ? '새벽이 밝았습니다' : '아직, 이야기는 끝나지 않았습니다', e.status === 'won' ? '성채를 지켜냈습니다' : '다시 일어설 시간', `도달 ${sim.difficulty.label} ${sim.state.wave}웨이브 · 처치 ${sim.state.defeatedEnemies} · 획득 조각 ${e.growthShardsAwarded}`) + `<div class="result-sigil">${icon('moon')}</div><p class="dialog-description">성장 조각으로 수호대를 강화하고, 더 먼 곳으로 나아가세요.</p><button data-restart class="dialog-primary">새로운 원정 준비</button>`);
             }
         }
         render();

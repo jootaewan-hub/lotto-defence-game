@@ -46,6 +46,7 @@ export const ADVANCED_UNIQUE_BASE_CHANCE = ADVANCED_UNIQUE_SUMMON_ENTRIES.reduce
 export function createInitialRunState(meta: MetaProgress = createDefaultMetaProgress()): RunState {
   const maxBaseHealth = 20 + getSkillEffectTotal(meta, "baseHealthBonus");
   return {
+    difficulty: 'normal',
     wave: 0,
     waveTimeRemainingMs: 0,
     gold: 100 + getSkillEffectTotal(meta, "startGold"),

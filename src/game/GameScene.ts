@@ -1,9 +1,12 @@
+import { getEvolutionVisual } from './evolutionVisuals';
+import { drawEvolutionOrnaments } from './EvolutionEffects';
+import { BATTLE_THEMES } from './battleThemes';
 import Phaser from 'phaser';
 import { getPathPosition, PATH_POINTS } from './geometry';
 import { GameSimulation, type SimulationEvent } from './simulation';
 import { getUnitDefinition, getUnitPortrait, getTowerType, getUniqueUnitLevel } from './units';
 import { SUPER_COLORS } from './superUnits';
-import { getRarity, getRarityIndex } from './rarities';
+import { getRarity } from './rarities';
 import { CombatEffects } from './CombatEffects';
 const S = 1.8;
 const point = (p: {
@@ -14,9 +17,13 @@ const ASSETS = `${import.meta.env.BASE_URL}assets/generated/fantasy-components/`
 export class GameScene extends Phaser.Scene {
     private ink!: Phaser.GameObjects.Graphics;
     private combat!: CombatEffects;
+    private backdrop!: Phaser.GameObjects.Image;
+    private arena!: Phaser.GameObjects.Graphics;
+    private backdropDifficulty = '';
     private lastWave = 0;
     private visualTime = 0;
     private units = new Map<string, Phaser.GameObjects.Image>();
+    private stageLabels = new Map<string, Phaser.GameObjects.Text>();
     private mobs = new Map<string, Phaser.GameObjects.Image>();
     private selected: number | null = null;
     private dragging: number | null = null;
@@ -27,13 +34,27 @@ export class GameScene extends Phaser.Scene {
     preload() {
         for (const key of ['knight', 'wizard', 'priest', 'storm-archer', 'plague-warlock', 'time-mage', 'frost-witch', 'berserker', 'orc', 'undead', 'skeleton', 'ogre'])
             this.load.image(key, `${ASSETS}${key}.png`);
+        this.load.image('super-atlas', `${import.meta.env.BASE_URL}assets/generated/super-unique-atlas.png`);
+        this.load.image('evolution-atlas', `${import.meta.env.BASE_URL}assets/generated/tower-evolution-atlas.png`);
         this.load.image('forest', `${import.meta.env.BASE_URL}assets/moonwood.png`);
+        for (const difficulty of ['nightmare', 'hell', 'insane'] as const)
+            this.load.svg(BATTLE_THEMES[difficulty].texture, `${import.meta.env.BASE_URL}assets/backgrounds/${difficulty}.svg`);
     }
     create() {
+        const atlas = this.textures.get('super-atlas');
+        const source = atlas.getSourceImage() as HTMLImageElement;
+        const half = source.width / 2;
+        ['archer', 'warrior', 'mage', 'priest'].forEach((type, i) => atlas.add(`super-${type}`, 0, (i % 2) * half, Math.floor(i / 2) * half, half, half));
+        const evolutionAtlas = this.textures.get('evolution-atlas');
+        const evolutionSource = evolutionAtlas.getSourceImage() as HTMLImageElement;
+        ['elite', 'ascended'].forEach((tier, row) => ['archer', 'warrior', 'mage', 'priest'].forEach((type, col) => {
+            const w = evolutionSource.width / 4, h = evolutionSource.height / 2;
+            evolutionAtlas.add(`evolution-${tier}-${type}`, 0, col * w, row * h, w, h);
+        }));
         this.cameras.main.setBackgroundColor('#101f24');
-        if (this.textures.exists('forest'))
-            this.add.image(390, 250, 'forest').setDisplaySize(780, 500).setAlpha(0.83);
+        this.backdrop = this.add.image(390, 250, 'forest').setDisplaySize(780, 500).setAlpha(0.83).setDepth(-2);
         this.drawArena();
+        this.updateBattleTheme();
         this.ink = this.add.graphics().setDepth(4);
         this.combat = new CombatEffects(this, this.reduced);
         this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
@@ -53,7 +74,7 @@ export class GameScene extends Phaser.Scene {
         });
         this.input.on('pointerup', () => this.dragging = null);
         this.input.on('gameout', () => this.dragging = null);
-        this.events.once('shutdown', () => { this.combat.clear(); this.units.clear(); this.mobs.clear(); });
+        this.events.once('shutdown', () => { this.combat.clear(); this.units.clear(); this.stageLabels.clear(); this.mobs.clear(); });
     }
     playEvents(events: SimulationEvent[]) { this.combat?.emit(events); }
     clearSelection() { this.selected = null; this.onSelectionChange(null); }
@@ -65,6 +86,7 @@ export class GameScene extends Phaser.Scene {
     }
     private drawArena() {
         const g = this.add.graphics();
+        this.arena = g;
         const pts = PATH_POINTS.map(point);
         // Layered stone causeway, following the exact simulation path.
         g.lineStyle(58, 0x030e13, 0.65);
@@ -151,6 +173,14 @@ export class GameScene extends Phaser.Scene {
                 this.tweens.add({ targets: dot, y: dot.y - 35, alpha: 0.05, duration: 2400 + i * 133, yoyo: true, repeat: -1 });
             }
     }
+    private updateBattleTheme() {
+        const difficulty = this.simulation.state.difficulty;
+        if (difficulty === this.backdropDifficulty) return;
+        this.backdropDifficulty = difficulty;
+        const theme = BATTLE_THEMES[difficulty];
+        this.backdrop.setTexture(theme.texture).setDisplaySize(780, 500).setAlpha(difficulty === 'normal' ? .83 : 1);
+        this.arena.setAlpha(difficulty === 'normal' ? 1 : .88);
+    }
     update(_time: number, delta: number) {
         if (!this.ink)
             return;
@@ -164,6 +194,7 @@ export class GameScene extends Phaser.Scene {
         // Small fixed upper bound prevents missed attacks at accelerated speed.
         for (let remaining = step; remaining > 0; remaining -= 40)
             this.simulation.update(Math.min(40, remaining));
+        this.updateBattleTheme();
         const events = this.simulation.drainEvents();
         this.combat.emit(events);
         this.combat.update(delta, speed, new Map(this.simulation.enemies.map(e => [e.id, getPathPosition(e.progress)])));
@@ -174,11 +205,15 @@ export class GameScene extends Phaser.Scene {
             if (!ids.has(id)) {
                 img.destroy();
                 this.units.delete(id);
+                this.stageLabels.get(id)?.destroy();
+                this.stageLabels.delete(id);
             }
         const mergeable = this.simulation.getMergeableSlots();
         board.forEach((u, i) => {
             const def = getUnitDefinition(u.definitionId), p = point(u), rarity = getRarity(def.rarity);
             const color = Phaser.Display.Color.HexStringToColor(rarity.color).color;
+            const visual = getEvolutionVisual(def, getUniqueUnitLevel(this.simulation.meta, def.id), board.length);
+            drawEvolutionOrnaments(this.ink, p.x, p.y, visual, getTowerType(def), def.superUnique ? SUPER_COLORS[getTowerType(def)] : color, this.reduced || !step ? 0 : time, board.length > 60);
             if (i === this.selected) {
                 const range = this.simulation.getTowerCombatStats(i)!.range;
                 this.ink.fillStyle(0x95dfca, 0.045);
@@ -205,14 +240,22 @@ export class GameScene extends Phaser.Scene {
             let img = this.units.get(u.instanceId);
             if (!img) {
                 const key = getUnitPortrait(def);
-                img = this.add.image(p.x, p.y, key).setOrigin(0.5, 0.78).setDepth(5);
-                const size = def.superUnique ? 86 + Math.min(10,getUniqueUnitLevel(this.simulation.meta,def.id)/10) : board.length>60?34:board.length>30?43:53 + Math.min(8, getRarityIndex(def.rarity) * 2);
+                const texture = def.superUnique ? 'super-atlas' : key.startsWith('evolution-') ? 'evolution-atlas' : key;
+                img = this.add.image(p.x, p.y, texture, texture !== key ? key : undefined).setOrigin(0.5, 0.78).setDepth(5);
+                const size = visual.size;
                 img.setDisplaySize(size, size);
                 this.units.set(u.instanceId, img);
                 const glow = this.add.circle(p.x, p.y, 28, color, 0.25).setDepth(7);
                 this.tweens.add({ targets: glow, scale: 2, alpha: 0, duration: 500, onComplete: () => glow.destroy() });
             }
-            const size = def.superUnique ? 86 + Math.min(10,getUniqueUnitLevel(this.simulation.meta,def.id)/10) : board.length>60?34:board.length>30?43:53 + Math.min(8, getRarityIndex(def.rarity) * 2);
+            const size = visual.size;
+            let badge = this.stageLabels.get(u.instanceId);
+            if (!badge) {
+                badge = this.add.text(p.x, p.y + 19, visual.badge, { fontFamily: 'sans-serif', fontSize: '10px', fontStyle: 'bold', color: def.superUnique ? '#ffdf8a' : rarity.color, backgroundColor: '#10212c', padding: { x: 3, y: 1 } }).setOrigin(.5).setDepth(7);
+                this.stageLabels.set(u.instanceId, badge);
+            }
+            badge.setPosition(p.x, p.y + 19);
+            if (badge.text !== visual.badge) badge.setText(visual.badge);
             this.combat.applyPose(u.instanceId, img, p, size, this.reduced || !step ? 0 : Math.sin(time / 440 + i) * 1.2);
         });
         const enemyIds = new Set(this.simulation.enemies.map(e => e.id));

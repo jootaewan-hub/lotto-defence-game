@@ -82,6 +82,7 @@ export interface UnitInstance {
 export type RunStatus = "ready" | "running" | "won" | "lost";
 
 export interface RunState {
+  difficulty: 'normal' | 'nightmare' | 'hell' | 'insane';
   wave: number;
   waveTimeRemainingMs: number;
   gold: number;

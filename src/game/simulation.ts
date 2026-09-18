@@ -1,4 +1,5 @@
-import { MAX_TOWERS, SUPER_COST, DRAGON_ITEMS, getSuperRecipe, getItemUpgradeChance, getItemUpgradeCost } from './superUnits';
+import { MAX_TOWERS, MAX_ITEM_UPGRADE_LEVEL, SUPER_COST, DRAGON_ITEMS, getSuperRecipe, getItemUpgradeChance, getItemUpgradeCost } from './superUnits';
+import { DIFFICULTIES } from './waves';
 import { rollNormalInteger, sampleRewards, type ExpeditionUpgrades, type RewardDefinition, type UpgradeRoll, type UpgradeStat } from './upgrades';
 import { TOWER_FIELD, TOWER_RADIUS, TOWER_SPAWN, clampTowerPosition, getPathPosition } from "./geometry";
 import {
@@ -112,6 +113,7 @@ const RARE_RARITY_INDEX = getRarityIndex("rare");
 const EPIC_RARITY_INDEX = getRarityIndex("epic");
 
 export class GameSimulation {
+  get difficulty() { return DIFFICULTIES[this.state.difficulty]; }
   readonly waves = buildWaves();
   readonly enemies: EnemyState[] = [];
 
@@ -162,7 +164,7 @@ export class GameSimulation {
   }
   upgradeDragonItem(slot: number, kind: DragonItemKind): {success:boolean;level:number;gain:number;cost:number}|null {
     const unit=this.state.board[slot],item=unit?.items?.find(i=>i.kind===kind);
-    if (!this.canManageTowers() || !unit || !getUnitDefinition(unit.definitionId).superUnique || !item || item.level>=9) return null;
+    if (!this.canManageTowers() || !unit || !getUnitDefinition(unit.definitionId).superUnique || !item || item.level>=MAX_ITEM_UPGRADE_LEVEL) return null;
     const level=item.level+1,cost=getItemUpgradeCost(level),chance=getItemUpgradeChance(level);
     if(this.state.gold<cost)return null;
     this.state.gold-=cost;
@@ -345,7 +347,8 @@ export class GameSimulation {
   }
 
   get upcomingWaveDefinition(): WaveDefinition | null {
-    return this.currentWaveActive ? null : (this.waves[this.state.wave] ?? null);
+    if (this.currentWaveActive || this.state.status === 'won' || this.state.status === 'lost') return null;
+    return this.waves[this.state.wave === MAX_WAVES && this.difficulty.next ? 0 : this.state.wave] ?? null;
   }
 
   drainEvents(): SimulationEvent[] {
@@ -355,6 +358,10 @@ export class GameSimulation {
   startNextWave(): void {
     if (!this.canStartWave) {
       return;
+    }
+    if (this.state.wave >= MAX_WAVES && this.difficulty.next) {
+      this.state = { ...this.state, difficulty: this.difficulty.next, wave: 0 };
+      this.events.push({ type: 'message', text: `${this.difficulty.label} 난이도 진입 · 1웨이브부터 다시 시작합니다.` });
     }
     const nextWave = this.state.wave + 1;
     const wave = this.waves[nextWave - 1];
@@ -641,7 +648,7 @@ export class GameSimulation {
   }
 
   completeRunRewards(): void {
-    const highestWave = Math.max(this.meta.highestWave, this.state.wave);
+    const highestWave = Math.max(this.meta.highestWave, this.state.difficulty === 'normal' ? this.state.wave : MAX_WAVES);
     const won = this.state.status === "won";
     this.meta = {
       ...this.meta,
@@ -672,34 +679,37 @@ export class GameSimulation {
       const trueBoss = wave.trueBossId ? getTrueBossDefinition(wave.trueBossId) : null;
       const hpMultiplier = variant.hpMultiplier * (trueBoss?.hpMultiplier ?? 1);
       const armorMultiplier = variant.armorMultiplier * (trueBoss?.armorMultiplier ?? 1);
-      const hp = Math.round(baseHp * wave.healthMultiplier * hpMultiplier);
-      const armor = Math.round(getWaveArmor(wave.number, wave.isBoss) * armorMultiplier);
-      this.enemies.push({
-        id: `enemy-${this.enemySequence += 1}`,
-        wave: wave.number,
-        variantId: trueBoss?.variantId ?? variant.id,
-        variantLabel: trueBoss?.label ?? variant.label,
-        variantTint: trueBoss?.tint ?? variant.tint,
-        variantTier: trueBoss?.tier ?? variant.tier,
-        trueBossId: wave.trueBossId,
-        hp,
-        maxHp: hp,
-        armor,
-        effects: [],
-        progress: 0,
-        speed: (wave.isBoss ? 0.07 : 0.12) * wave.speedMultiplier * variant.speedMultiplier * (trueBoss?.speedMultiplier ?? 1),
-        rewardGold: Math.max(
-          1,
-          Math.round(
-            scaleEnemyReward(
-              wave.isBoss
-                ? 58 + Math.floor((wave.number - 1) / 5) * 18 + wave.number
-                : 5 + Math.floor(wave.number / 4) + Math.floor((wave.number - 1) / 5),
-            ) * variant.rewardMultiplier * (trueBoss?.rewardMultiplier ?? 1),
+      const hp = Math.round(Math.round(baseHp * wave.healthMultiplier * hpMultiplier) * this.difficulty.statMultiplier);
+      const armor = Math.round(Math.round(getWaveArmor(wave.number, wave.isBoss) * armorMultiplier) * this.difficulty.statMultiplier);
+      // Double each spawn batch, including bosses, without changing wave timing.
+      for (let copy = 0; copy < this.difficulty.spawnMultiplier; copy += 1) {
+        this.enemies.push({
+          id: `enemy-${this.enemySequence += 1}`,
+          wave: wave.number,
+          variantId: trueBoss?.variantId ?? variant.id,
+          variantLabel: trueBoss?.label ?? variant.label,
+          variantTint: trueBoss?.tint ?? variant.tint,
+          variantTier: trueBoss?.tier ?? variant.tier,
+          trueBossId: wave.trueBossId,
+          hp,
+          maxHp: hp,
+          armor,
+          effects: [],
+          progress: 0,
+          speed: (wave.isBoss ? 0.07 : 0.12) * wave.speedMultiplier * variant.speedMultiplier * (trueBoss?.speedMultiplier ?? 1),
+          rewardGold: Math.max(
+            1,
+            Math.round(
+              scaleEnemyReward(
+                wave.isBoss
+                  ? 58 + Math.floor((wave.number - 1) / 5) * 18 + wave.number
+                  : 5 + Math.floor(wave.number / 4) + Math.floor((wave.number - 1) / 5),
+              ) * variant.rewardMultiplier * (trueBoss?.rewardMultiplier ?? 1),
+            ),
           ),
-        ),
-        isBoss: wave.isBoss,
+          isBoss: wave.isBoss,
       });
+      }
 
       this.remainingSpawns -= 1;
       this.spawnTimerMs += wave.isBoss ? BOSS_SPAWN_INTERVAL_MS : Math.max(180, Math.floor(wave.durationMs / (wave.enemyCount * NORMAL_SPAWN_DENSITY)));
@@ -993,7 +1003,7 @@ export class GameSimulation {
     this.state = { ...this.state, waveTimeRemainingMs: 0, growthShardsEarned };
     this.events.push({ type: "waveComplete", wave: completedWave, growthShardsAwarded });
 
-    if (completedWave >= MAX_WAVES) {
+    if (completedWave >= MAX_WAVES && !this.difficulty.next) {
       this.endRun("won");
       return;
     }

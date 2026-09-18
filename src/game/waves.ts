@@ -1,6 +1,18 @@
-import type { WaveDefinition } from "./types";
+import type { RunState, WaveDefinition } from "./types";
 
 export const MAX_WAVES = 120;
+
+export const DIFFICULTIES: Record<RunState['difficulty'], {
+  label: string;
+  statMultiplier: number;
+  spawnMultiplier: number;
+  next: RunState['difficulty'] | null;
+}> = {
+  normal: { label: '보통', statMultiplier: 1, spawnMultiplier: 1, next: 'nightmare' },
+  nightmare: { label: '나이트메어', statMultiplier: 1.5, spawnMultiplier: 1, next: 'hell' },
+  hell: { label: '헬', statMultiplier: 2.5, spawnMultiplier: 1, next: 'insane' },
+  insane: { label: 'Insane', statMultiplier: 4, spawnMultiplier: 2, next: null },
+};
 
 export function buildWaves(): WaveDefinition[] {
   return Array.from({ length: MAX_WAVES }, (_, index) => {

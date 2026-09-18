@@ -126,8 +126,10 @@ export function getTowerType(unit: UnitDefinition): TowerType {
   return unit.towerType ?? (unit.uniqueAbility === 'multishot' ? 'archer' : unit.role === 'single' ? 'warrior' : unit.role === 'area' ? 'mage' : 'priest');
 }
 export function getUnitPortrait(unit: UnitDefinition): string {
-  if (unit.superUnique) return ({archer:'storm-archer',warrior:'berserker',mage:'wizard',priest:'priest'})[getTowerType(unit)];
+  if (unit.superUnique) return `super-${getTowerType(unit)}`;
   if (unit.uniqueAbility) return ({multishot:'storm-archer',poison:'plague-warlock',slow:'time-mage',freeze:'frost-witch',berserk:'berserker'})[unit.uniqueAbility];
+  const stage = RARITIES.findIndex(r => r.id === unit.rarity) + 1;
+  if (stage >= 4) return `evolution-${stage >= 7 ? 'ascended' : 'elite'}-${getTowerType(unit)}`;
   return ({archer:'storm-archer',warrior:'knight',mage:'wizard',priest:'priest'})[getTowerType(unit)];
 }
 
