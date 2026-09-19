@@ -2,7 +2,7 @@ import { MAX_TOWERS, MAX_ITEM_UPGRADE_LEVEL, SUPER_COST, DRAGON_ITEMS, getSuperR
 import { DIFFICULTIES } from './waves';
 import { ULTIMATE_ID, ULTIMATE_COST, getUltimateRecipe } from './ultimate';
 import { rollNormalInteger, sampleRewards, type ExpeditionUpgrades, type RewardDefinition, type UpgradeRoll, type UpgradeStat } from './upgrades';
-import { TOWER_FIELD, TOWER_RADIUS, TOWER_SPAWN, clampTowerPosition, getPathPosition } from "./geometry";
+import { TOWER_SPAWN, clampTowerPosition, getPathPosition } from "./geometry";
 import {
   MAX_WAVES,
   buildWaves,
@@ -58,6 +58,7 @@ import {
   scaleEnemyReward,
 } from "./combatMath";
 export { getEnemyExperienceReward } from "./combatMath";
+import { compareUnitsForArrangement, createTowerEdgeCandidates } from "./towerArrangement";
 
 export interface MergePrompt {
   sourceSlots: number[];
@@ -1220,48 +1221,4 @@ export class GameSimulation {
       failureShardsAwarded,
     });
   }
-}
-
-function compareUnitsForArrangement(
-  left: RunState["board"][number],
-  right: RunState["board"][number],
-): number {
-  const leftDefinition = getUnitDefinition(left.definitionId);
-  const rightDefinition = getUnitDefinition(right.definitionId);
-  const uniqueOrder = Number(Boolean(rightDefinition.uniqueAbility)) - Number(Boolean(leftDefinition.uniqueAbility));
-  if (uniqueOrder !== 0) {
-    return uniqueOrder;
-  }
-
-  const rarityOrder = getRarityIndex(rightDefinition.rarity) - getRarityIndex(leftDefinition.rarity);
-  if (rarityOrder !== 0) {
-    return rarityOrder;
-  }
-  return left.definitionId.localeCompare(right.definitionId);
-}
-
-function createTowerEdgeCandidates(count: number): Array<{ x: number; y: number }> {
-  const left = TOWER_FIELD.x + TOWER_RADIUS;
-  const right = TOWER_FIELD.x + TOWER_FIELD.width - TOWER_RADIUS;
-  const top = TOWER_FIELD.y + TOWER_RADIUS;
-  const bottom = TOWER_FIELD.y + TOWER_FIELD.height - TOWER_RADIUS;
-  const width = right - left;
-  const height = bottom - top;
-  const perimeter = (width + height) * 2;
-  const candidates: Array<{ x: number; y: number }> = [{ x: left + width / 2, y: top }];
-
-  for (let index = 1; index < count; index += 1) {
-    const distance = (index / count) * perimeter;
-    if (distance <= width) {
-      candidates.push({ x: left + distance, y: top });
-    } else if (distance <= width + height) {
-      candidates.push({ x: right, y: top + distance - width });
-    } else if (distance <= width * 2 + height) {
-      candidates.push({ x: right - (distance - width - height), y: bottom });
-    } else {
-      candidates.push({ x: left, y: bottom - (distance - width * 2 - height) });
-    }
-  }
-
-  return candidates;
 }
