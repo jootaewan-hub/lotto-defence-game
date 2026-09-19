@@ -53,6 +53,7 @@
 **배경 (구현자가 알아야 할 것):**
 - `update(deltaMs)`는 `pendingReward`가 설정된 동안 조기 반환한다(`simulation.ts:433`). 보상은 10웨이브마다 뜨므로 `autoProgress = true`가 없으면 틱 루프가 10웨이브에서 영구히 멈춘다.
 - `RunStatus`는 `"ready" | "running" | "won" | "lost"`이고 **초기값이 `"ready"`**다. 루프 조건을 `status === 'running'`으로 쓰면 시작하자마자 종료된다. 반드시 `!== 'won' && !== 'lost'`로 쓴다.
+- `createInitialRunState`의 성장 0 초기값을 실측했다: `board: []`(**빈 보드**), `gold: 100`, `wave: 0`, `baseHealth: 20`, `freeSummons: 0`. README의 "수호자 3명으로 시작"은 UI 계층이 하는 일이며 시뮬레이션에는 해당하지 않는다. `summonCost`는 초기 10이다. 정책의 소환 문턱을 이 수치들 위에서 정해야 한다 — 초기 골드 100을 넘는 유보금을 두면 한 번도 소환하지 못한다.
 - 경계 상태만 기록하면 부족하다. 웨이브 경계에서 `enemies`는 비어 있고 `gold`·`baseHealth`는 처치·유출 결과가 달라질 때만 움직인다. 피해 계산이 미세하게 틀려도 처치 여부가 안 바뀌면 드러나지 않는다. 그래서 `damage` 이벤트의 타격당 수치를 해시에 넣는다.
 - `attack`·`superSkill`·`message` 이벤트는 연출·문구이므로 해시에서 제외한다. 산술은 `damage`가 담는다.
 - `compareUnitsForArrangement`는 `sortUnitsByType()` 경로로만 실행된다. 호출하지 않으면 태스크 4의 절반이 검증되지 않은 채 남는다.
@@ -70,7 +71,6 @@ const SEED = 20260919;
 const TICK_MS = 16;
 const MAX_WAVE = 40;
 const BOARD_CAP = 60;
-const GOLD_RESERVE = 200;
 const POLICY_INTERVAL_TICKS = 64;
 const SORT_AT_TICK = 5_000;
 const TICK_LIMIT = 400_000;
@@ -105,15 +105,20 @@ function foldEvent(hash: number, event: SimulationEvent): number {
   }
 }
 
-/** 시뮬레이션 상태만 보고 결정하므로 RNG 소비 순서가 고정된다. */
+/**
+ * 시뮬레이션 상태만 보고 결정하므로 RNG 소비 순서가 고정된다.
+ * 정책 1회당 소환은 최대 1회다. 소환을 루프로 돌리면 골드를 0까지 빨아들여
+ * 강화 분기가 영원히 실행되지 않는다(소환 후 잔액 10 미만 < 강화비 25 이상).
+ * 1회로 제한하면 64틱마다 골드가 쌓여 소환·합성·강화 세 경로가 모두 실행된다.
+ */
 function applyPolicy(sim: GameSimulation): void {
-  while (sim.state.board.length < BOARD_CAP && sim.state.gold >= sim.summonCost + GOLD_RESERVE) {
-    if (!sim.summonToFirstEmpty()) break;
+  if (sim.state.board.length < BOARD_CAP && sim.state.gold >= sim.summonCost) {
+    sim.summonToFirstEmpty();
   }
   sim.bulkMergeAll();
   if (sim.state.board.length > 0) {
     const cost = sim.getTowerUpgradeCost(0);
-    if (sim.state.gold >= cost + GOLD_RESERVE && sim.rollTowerUpgrade(0, 'attack')) {
+    if (sim.state.gold >= cost * 2 && sim.rollTowerUpgrade(0, 'attack')) {
       sim.resolveUpgradeRoll();
     }
   }
@@ -180,8 +185,9 @@ function runGolden(): { records: WaveRecord[]; ticks: number } {
 test('리팩터링 기준선: 40웨이브 경계 상태와 이벤트 해시', () => {
   const { records, ticks } = runGolden();
 
-  // 루프가 조기 정지하지 않았는지 먼저 확인한다. 스냅샷이 빈 배열로 고정되면 의미가 없다.
-  expect(records.length).toBeGreaterThan(30);
+  // 루프가 조기 정지하지 않았는지만 확인한다. 정확한 도달 지점은 스냅샷이 records
+  // 배열 전체로 고정하므로, 여기서 40웨이브 생존을 단언하지 않는다.
+  expect(records.length).toBeGreaterThanOrEqual(10);
   expect(ticks).toBeLessThan(TICK_LIMIT);
 
   expect(records).toMatchSnapshot();
@@ -194,7 +200,9 @@ Run: `npx vitest run tests/golden-snapshot.test.ts`
 
 Expected: PASS. 스냅샷 파일이 새로 생성된다(`1 snapshot written` 표기). `Duration` 값을 기록해 둔다. 스펙은 3~6초를 예상한다.
 
-`records.length`가 30 이하로 실패하면 루프가 조기 정지한 것이다. `autoProgress = true`가 설정되었는지, 루프 조건이 `status !== 'won' && status !== 'lost'`인지 확인한다.
+`records.length`가 10 미만으로 실패하면 루프가 조기 정지한 것이다. `autoProgress = true`가 설정되었는지, 루프 조건이 `status !== 'won' && status !== 'lost'`인지 확인한다.
+
+40웨이브에 못 미치고 패배로 끝나도 **기준선으로 채택한다.** 이 테스트의 목적은 승리 검증이 아니라 리팩터링 회귀 검출이며, 패배로 끝나는 궤적도 spawn·move·attack·collect·effects·합성·소환·강화·웨이브 완료·유출 피해·`endRun`을 전부 거친다. 어디서 끝났는지는 보고에 적는다.
 
 - [ ] **Step 3: 스냅샷 안정성 확인 — 두 번 더 실행해 동일한지 본다**
 
