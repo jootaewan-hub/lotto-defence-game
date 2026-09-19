@@ -16,6 +16,7 @@
 - `GameSimulation`의 공개 멤버 48개를 보존한다. 소비자 16개 파일(`src` 6, `tests` 10)은 무변경이어야 한다.
 - 코드를 옮길 때 로직을 정리하거나 개선하지 않는다. 개선점은 별도로 기록만 한다.
 - 각 태스크는 `npm test`와 `npm run build`를 모두 통과해야 다음으로 넘어간다.
+- `tsconfig.json`에 `noUnusedLocals: true`와 `noUnusedParameters: true`가 켜져 있다. 미사용 import는 경고가 아니라 **오류**이며, `npm run build`가 `tsc && vite build`이므로 빌드까지 실패한다. 함수를 옮길 때마다 남겨진 import를 반드시 정리한다.
 - `npx vitest -u`(스냅샷 갱신)를 **절대 실행하지 않는다.** 기준선이 조용히 덮어씌워진다.
 - 작업 브랜치는 `refactor/simulation-split`이다. push는 사용자가 지시할 때만 한다.
 - 커밋 메시지 말미에 다음 두 줄을 넣는다.
@@ -345,10 +346,19 @@ import type {
 
 삭제: 1219–1232행, 1395–1477행, 상수 4줄(106–109행).
 
-import 블록 끝에 추가한다.
+import 블록 끝에 추가한다. **여덟 개 전부가 필요하다.** 태스크 3 시점에는 전투 구간(712–1016행)이 아직 `simulation.ts` 안에 있고, 그 구간이 방금 옮긴 함수들을 호출하기 때문이다 — `getEnemyMovementMultiplier`(773행), `getWaveArmor`(735행), `scaleEnemyReward`(755행), `applyArmor`(873·884행), `applyUniqueAbility`(876·887행), `describeJackpot`(960행), `getEnemyExperienceReward`(938행). 여기에 전투 구간 밖 `getWaveCleanupWindowMs`(380행)가 더해진다. 이들은 태스크 6에서야 떠난다.
 
 ```ts
-import { getEnemyExperienceReward, getWaveCleanupWindowMs } from "./combatMath";
+import {
+  applyArmor,
+  applyUniqueAbility,
+  describeJackpot,
+  getEnemyExperienceReward,
+  getEnemyMovementMultiplier,
+  getWaveArmor,
+  getWaveCleanupWindowMs,
+  scaleEnemyReward,
+} from "./combatMath";
 ```
 
 그리고 import 블록 바로 아래에 re-export를 둔다.
@@ -357,7 +367,7 @@ import { getEnemyExperienceReward, getWaveCleanupWindowMs } from "./combatMath";
 export { getEnemyExperienceReward } from "./combatMath";
 ```
 
-주의: 태스크 3 시점에는 938행(전투 구간)이 아직 남아 `getEnemyExperienceReward`를 호출한다. 그래서 **import와 re-export를 둘 다** 둔다. TypeScript는 `import { X } from 'm'`과 `export { X } from 'm'`의 공존을 허용한다. 태스크 6에서 938행이 떠나면 import 쪽은 미사용이 되므로 그때 제거한다.
+주의: `getEnemyExperienceReward`는 import와 re-export에 **둘 다** 등장한다. 938행이 호출하므로 지역 바인딩이 필요하고, 테스트가 `simulation`에서 import하므로 re-export도 필요하다. `export { X } from 'm'` 형태는 지역 바인딩을 만들지 않으므로 충돌하지 않는다.
 
 - [ ] **Step 3: 타입 검사**
 
@@ -720,7 +730,15 @@ import { attackEnemies, moveEnemies, spawnEnemies, tickBuffs, tickEnemyEffects }
 
 `combatCounters`는 태스크 5에서 이미 승격되었다. `readonly rng`와 `readonly events`의 `readonly`는 유지한다 — 재대입을 막으면서 인터페이스는 만족한다.
 
-태스크 3에서 둔 `import { getEnemyExperienceReward, ... } from "./combatMath"`에서 `getEnemyExperienceReward`는 이제 미사용이 되므로 import 목록에서 뺀다. `export { getEnemyExperienceReward } from "./combatMath";` re-export는 **반드시 남긴다.**
+태스크 3에서 둔 `combatMath` import 여덟 개 중 **일곱 개를 제거해야 한다.** 그 함수들의 호출부가 전투 구간과 함께 `combat.ts`로 떠났기 때문이다. 남는 것은 `getWaveCleanupWindowMs` 하나뿐이다 — 380행이 유일한 잔존 호출부다.
+
+```ts
+import { getWaveCleanupWindowMs } from "./combatMath";
+```
+
+`tsconfig.json`에 `noUnusedLocals: true`가 켜져 있으므로 이 정리는 선택이 아니라 **필수**다. 남겨두면 `tsc`가 오류를 내고 `npm run build`(`tsc && vite build`)까지 실패한다.
+
+`export { getEnemyExperienceReward } from "./combatMath";` re-export는 **반드시 남긴다.** `tests/game-systems.test.ts`가 이 경로로 import한다.
 
 - [ ] **Step 4: 타입 검사로 인터페이스를 다듬는다**
 
