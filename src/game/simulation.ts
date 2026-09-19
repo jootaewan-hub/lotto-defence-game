@@ -2,7 +2,7 @@ import { MAX_TOWERS, MAX_ITEM_UPGRADE_LEVEL, SUPER_COST, DRAGON_ITEMS, getSuperR
 import { DIFFICULTIES } from './waves';
 import { ULTIMATE_ID, ULTIMATE_COST, getUltimateRecipe } from './ultimate';
 import { rollNormalInteger, sampleRewards, type ExpeditionUpgrades, type RewardDefinition, type UpgradeRoll, type UpgradeStat } from './upgrades';
-import { TOWER_SPAWN, clampTowerPosition, getPathPosition } from "./geometry";
+import { TOWER_SPAWN, clampTowerPosition } from "./geometry";
 import {
   MAX_WAVES,
   buildWaves,
@@ -12,9 +12,6 @@ import {
   getFailureGrowthShards,
   getSkillEffectTotal,
   pickRarity,
-  resolveJackpotReward,
-  rollJackpotReward,
-  rollKillGoldReward,
   type SummonKind,
 } from "./systems";
 import type { Rng } from "./rng";
@@ -23,7 +20,6 @@ import type {
   DragonItemKind,
   UnitInstance,
   EnemyState,
-  EnemyStatusEffect,
   GoldRewardTier,
   JackpotReward,
   MetaProgress,
@@ -35,30 +31,19 @@ import type {
   WaveDefinition,
 } from "./types";
 import { getRarity, getRarityIndex } from "./rarities";
-import { getUniqueAbilityStats } from "./uniqueAbilities";
 import {
-  getTowerType,
   getEffectiveUnitStats,
   getUniqueUnitLevel,
   getUnitDefinition,
   getUnitsByRarity,
-  grantUniqueUnitExperience,
   isUniqueUnit,
   registerUniqueUnitAcquisition,
 } from "./units";
-import { getEnemyVariant, getTrueBossDefinition } from "./enemyVariants";
-import {
-  applyArmor,
-  applyUniqueAbility,
-  describeJackpot,
-  getEnemyExperienceReward,
-  getEnemyMovementMultiplier,
-  getWaveArmor,
-  getWaveCleanupWindowMs,
-  scaleEnemyReward,
-} from "./combatMath";
+import { getTrueBossDefinition } from "./enemyVariants";
+import { getWaveCleanupWindowMs } from "./combatMath";
 export { getEnemyExperienceReward } from "./combatMath";
 import { compareUnitsForArrangement, createTowerEdgeCandidates } from "./towerArrangement";
+import { attackEnemies, moveEnemies, spawnEnemies, tickBuffs, tickEnemyEffects } from "./combat";
 
 export interface MergePrompt {
   sourceSlots: number[];
@@ -112,10 +97,7 @@ const EPIC_PITY_THRESHOLD = 16;
 const BASE_JACKPOT_CHANCE = 0.025;
 const JACKPOT_PITY_STEP = 0.002;
 const JACKPOT_PITY_MAX_BONUS = 0.06;
-const NORMAL_SPAWN_DENSITY = 4.8;
-const BOSS_SPAWN_INTERVAL_MS = 7_200;
 const NEXT_WAVE_DELAY_MS = 5_000;
-const POISON_TICK_MS = 500;
 const RARE_RARITY_INDEX = getRarityIndex("rare");
 const EPIC_RARITY_INDEX = getRarityIndex("epic");
 
@@ -135,7 +117,8 @@ export class GameSimulation {
   rewardHistory: UpgradeRoll[] = [];
 
   getUpgradeValue(stat: UpgradeStat): number { return this.upgrades[stat] ?? 0; }
-  private bonus(stat: UpgradeStat): number { return this.getUpgradeValue(stat) / 100; }
+  /** 내부 전용. combat.ts가 CombatContext로 접근하므로 private이 아니다. 소비자 API는 아니다. */
+  bonus(stat: UpgradeStat): number { return this.getUpgradeValue(stat) / 100; }
   get expeditionAttackBonus(): number { return this.bonus('attack'); }
   set expeditionAttackBonus(value: number) { this.upgrades.attack = value * 100; }
 
@@ -143,7 +126,8 @@ export class GameSimulation {
     const def = getUnitDefinition(unit.definitionId);
     return this.currentWaveActive && Boolean(def.superUnique) && (unit.superElapsedMs ?? 0) % (def.ultimate ? 10000 : 8000) < (def.ultimate ? 6000 : 5000);
   }
-  private getSuperAura(): number {
+  /** 내부 전용. combat.ts가 CombatContext로 접근하므로 private이 아니다. 소비자 API는 아니다. */
+  getSuperAura(): number {
     if (this.currentWaveActive && this.state.board.some(u => u.definitionId === ULTIMATE_ID)) return 1.25;
     return this.currentWaveActive && this.state.board.some(u => u.definitionId === 'super-priest' && (u.superElapsedMs ?? 0) % 15000 < 10000) ? 1.075 : 1;
   }
@@ -215,7 +199,8 @@ export class GameSimulation {
     this.events.push({type:'message',text:`${DRAGON_ITEMS.find(d=>d.kind===kind)!.name} ${success?`+${item.level} 강화 성공`:'강화 실패 · 기존 강화 유지'}`});
     return {success,level:item.level,gain,cost};
   }
-  private randomInteger(min:number,max:number):number {return Math.min(max,min+Math.floor(this.rng.next()*(max-min+1)));}
+  /** 내부 전용. combat.ts가 CombatContext로 접근하므로 private이 아니다. 소비자 API는 아니다. */
+  randomInteger(min:number,max:number):number {return Math.min(max,min+Math.floor(this.rng.next()*(max-min+1)));}
   private tickSuperUnits(deltaMs: number): void {
     if (!this.currentWaveActive) return;
     for(const unit of this.state.board){
@@ -310,10 +295,13 @@ export class GameSimulation {
     return true;
   }
 
-  private readonly rng: Rng;
-  private readonly events: SimulationEvent[] = [];
+  /** 내부 전용. combat.ts가 CombatContext로 접근하므로 private이 아니다. 소비자 API는 아니다. */
+  readonly rng: Rng;
+  /** 내부 전용. combat.ts가 CombatContext로 접근하므로 private이 아니다. 소비자 API는 아니다. */
+  readonly events: SimulationEvent[] = [];
   private unitSequence = 0;
-  private currentWaveActive = false;
+  /** 내부 전용. combat.ts가 CombatContext로 접근하므로 private이 아니다. 소비자 API는 아니다. */
+  currentWaveActive = false;
   private nextWaveDelayMs = 0;
   private successfulSummons = 0;
   private rareDrySummons = 0;
@@ -450,12 +438,12 @@ export class GameSimulation {
     if (this.tickNextWaveDelay(deltaMs)) {
       return;
     }
-    this.tickBuffs(deltaMs);
+    tickBuffs(this, deltaMs);
     this.tickSuperUnits(deltaMs);
-    this.tickEnemyEffects(deltaMs);
-    this.spawnEnemies(deltaMs);
-    this.moveEnemies(deltaMs);
-    this.attackEnemies(deltaMs);
+    tickEnemyEffects(this, deltaMs);
+    spawnEnemies(this, deltaMs);
+    moveEnemies(this, deltaMs);
+    attackEnemies(this, deltaMs);
     this.tickWaveTimer(deltaMs);
     this.checkWaveCompletion();
   }
@@ -719,311 +707,6 @@ export class GameSimulation {
     };
   }
 
-  private spawnEnemies(deltaMs: number): void {
-    if (!this.currentWaveActive || this.combatCounters.remainingSpawns <= 0) {
-      return;
-    }
-
-    const wave = this.waves[this.state.wave - 1]!;
-    const cleanupWindowMs = getWaveCleanupWindowMs(wave);
-    const spawnableDeltaMs = Math.min(deltaMs, Math.max(0, this.state.waveTimeRemainingMs - cleanupWindowMs));
-    if (spawnableDeltaMs <= 0) {
-      return;
-    }
-
-    this.combatCounters.spawnTimerMs -= spawnableDeltaMs;
-
-    while (this.combatCounters.remainingSpawns > 0 && this.combatCounters.spawnTimerMs <= 0) {
-      const baseHp = wave.isBoss ? 280 : 46;
-      const sequence = this.combatCounters.enemySequence + 1;
-      const variant = getEnemyVariant(wave.number, wave.isBoss, sequence);
-      const namedBossId = wave.trueBossId ?? wave.bossId;
-      const trueBoss = namedBossId ? getTrueBossDefinition(namedBossId) : null;
-      const hpMultiplier = variant.hpMultiplier * (trueBoss?.hpMultiplier ?? 1);
-      const armorMultiplier = variant.armorMultiplier * (trueBoss?.armorMultiplier ?? 1);
-      const hp = Math.round(Math.round(baseHp * wave.healthMultiplier * hpMultiplier) * this.difficulty.statMultiplier);
-      const armor = Math.round(Math.round(getWaveArmor(wave.number, wave.isBoss) * armorMultiplier) * this.difficulty.statMultiplier);
-      // Double each spawn batch, including bosses, without changing wave timing.
-      for (let copy = 0; copy < this.difficulty.spawnMultiplier; copy += 1) {
-        this.enemies.push({
-          id: `enemy-${this.combatCounters.enemySequence += 1}`,
-          wave: wave.number,
-          variantId: trueBoss?.variantId ?? variant.id,
-          variantLabel: trueBoss?.label ?? variant.label,
-          variantTint: trueBoss?.tint ?? variant.tint,
-          variantTier: trueBoss?.tier ?? variant.tier,
-          trueBossId: wave.trueBossId,
-          hp,
-          maxHp: hp,
-          armor,
-          effects: [],
-          progress: 0,
-          speed: (wave.isBoss ? 0.07 : 0.12) * wave.speedMultiplier * variant.speedMultiplier * (trueBoss?.speedMultiplier ?? 1),
-          rewardGold: Math.max(
-            1,
-            Math.round(
-              scaleEnemyReward(
-                wave.isBoss
-                  ? 58 + Math.floor((wave.number - 1) / 5) * 18 + wave.number
-                  : 5 + Math.floor(wave.number / 4) + Math.floor((wave.number - 1) / 5),
-              ) * variant.rewardMultiplier * (trueBoss?.rewardMultiplier ?? 1),
-            ),
-          ),
-          isBoss: wave.isBoss,
-      });
-      }
-
-      this.combatCounters.remainingSpawns -= 1;
-      this.combatCounters.spawnTimerMs += wave.isBoss ? BOSS_SPAWN_INTERVAL_MS : Math.max(180, Math.floor(wave.durationMs / (wave.enemyCount * NORMAL_SPAWN_DENSITY)));
-    }
-  }
-
-  private moveEnemies(deltaMs: number): void {
-    for (const enemy of this.enemies) {
-      enemy.progress += enemy.speed * getEnemyMovementMultiplier(enemy) * (deltaMs / 1000);
-    }
-  }
-
-  private attackEnemies(deltaMs: number): void {
-    const supportCount = this.state.board.reduce((count, unit) => {
-      return getUnitDefinition(unit.definitionId).role === "support" ? count + 1 : count;
-    }, 0);
-    const supportSpeedMultiplier = Math.min(1.25, 1 + supportCount * 0.025);
-    const attackBuff = this.getBuffMultiplier("attack");
-    const speedBuff =
-      this.getBuffMultiplier("attackSpeed") *
-      supportSpeedMultiplier *
-      (1 + getSkillEffectTotal(this.meta, "attackSpeedBonus"));
-    const criticalChanceBonus = getSkillEffectTotal(this.meta, "criticalChanceBonus");
-    const uniqueAttackBonus = getSkillEffectTotal(this.meta, "uniqueAttackBonus");
-    const uniqueSkillPowerBonus = getSkillEffectTotal(this.meta, "uniqueSkillPowerBonus") + this.bonus("skillPower");
-    const bossDamageBonus = getSkillEffectTotal(this.meta, "bossDamageBonus") + this.bonus("bossDamage");
-
-    const shared={formation:this.formationBonus,aura:this.getSuperAura()};
-    this.state.board.forEach((unit, unitIndex) => {
-      const definition = getUnitDefinition(unit.definitionId);
-      const uniqueLevel = getUniqueUnitLevel(this.meta, definition.id);
-      const stats = this.getTowerCombatStats(unitIndex,shared)!;
-      if (definition.ultimate && this.currentWaveActive && (unit.ultimateCooldownMs ?? 0) <= 0) {
-        const targets = this.enemies.filter(e => e.hp > 0);
-        if (targets.length) {
-          unit.ultimateCooldownMs = 12000;
-          for (const target of targets) {
-            const amount = Math.round(stats.attack * 6 * attackBuff * (1 + uniqueSkillPowerBonus) * (target.isBoss ? 2 * (1 + bossDamageBonus) : 1));
-            target.hp -= amount;
-            target.lastHitByDefinitionId = definition.id;
-            this.events.push({ type: 'damage', targetId: target.id, at: getPathPosition(target.progress), amount, critical: false, rarityTier: 9 });
-          }
-          this.events.push({ type: 'superSkill', skill: 'heaven-split', sourceId: unit.instanceId, at: { x: unit.x, y: unit.y }, targets: targets.map(e => getPathPosition(e.progress)) });
-        }
-      }
-      const abilityStats = definition.uniqueAbility ? getUniqueAbilityStats(definition.uniqueAbility, uniqueLevel) : null;
-      const berserkStats = abilityStats?.ability === "berserk" ? abilityStats : null;
-      const multishotStats = abilityStats?.ability === "multishot" ? abilityStats : null;
-      const berserkActive = Boolean(berserkStats) && (unit.berserkRemainingMs ?? 0) > 0;
-      const unitSpeedMultiplier = speedBuff * (berserkActive ? berserkStats!.speedMultiplier : 1);
-
-      unit.cooldownMs -= deltaMs * unitSpeedMultiplier;
-      if (unit.cooldownMs > 0) {
-        return;
-      }
-
-      const rarity = getRarity(definition.rarity);
-      const rarityTier = getRarityIndex(definition.rarity);
-      const superType=definition.superUnique?getTowerType(definition):undefined;
-      const targets = superType==='mage'?this.enemies.filter(e=>e.hp>0):this.findTargets(unit, stats.range, superType==='archer'||superType==='warrior'?5:multishotStats?.targetCount ?? 1);
-      unit.cooldownMs = stats.attackSpeed;
-      if (targets.length === 0) {
-        return;
-      }
-
-      const critical = this.rng.next() < Math.min(0.85, stats.criticalChance + criticalChanceBonus);
-      const damage = Math.round(
-        stats.attack * (superType && superType !== 'priest' ? (definition.ultimate ? 0.5 : 0.25) : 1) *
-          attackBuff *
-          (definition.uniqueAbility ? 1 + uniqueAttackBonus : 1) *
-          (critical ? 1.75 + this.bonus("criticalDamage") : 1) *
-          (multishotStats ? multishotStats.damageMultiplier * (1 + uniqueSkillPowerBonus) : 1) *
-          (berserkActive ? berserkStats!.damageMultiplier * (1 + uniqueSkillPowerBonus) : 1),
-      );
-      const origin = { x: unit.x, y: unit.y };
-      const weapon=unit.items?.find(i=>i.kind==='weapon'),ring=unit.items?.find(i=>i.kind==='ring');
-      if(superType==='mage')this.events.push({type:'superSkill',skill:'inferno',sourceId:unit.instanceId,at:origin,targets:targets.map(e=>getPathPosition(e.progress))});
-
-      if (berserkStats) {
-        unit.berserkRemainingMs = berserkStats.durationMs;
-      }
-
-      for (const target of targets) {
-        const targetPosition = getPathPosition(target.progress);
-        const attackId = `attack-${++this.combatCounters.attackSequence}`;
-        this.events.push({
-          type: "attack",
-          attackId,
-          sourceId: unit.instanceId,
-          superType,
-          unitLevel: uniqueLevel,
-          target: { id: target.id, isBoss: target.isBoss, variantTier: target.variantTier },
-          from: origin,
-          to: targetPosition,
-          critical,
-          rarityTier,
-          color: rarity.color,
-          role: definition.role,
-          ability: definition.uniqueAbility ?? (getTowerType(definition) === "archer" ? "multishot" : undefined),
-        });
-        if (!definition.superUnique && definition.role === "area" && definition.uniqueAbility !== "freeze") {
-          for (const enemy of this.enemies) {
-            if (enemy.hp <= 0) {
-              continue;
-            }
-            const position = getPathPosition(enemy.progress);
-            if (Math.hypot(position.x - targetPosition.x, position.y - targetPosition.y) <= 72 * (1 + this.bonus("splashRadius"))) {
-              const bossAdjustedDamage = Math.round(damage * (enemy.isBoss ? 1 + bossDamageBonus : 1));
-              const areaDamage = applyArmor(Math.round(bossAdjustedDamage * 0.75), enemy.armor * (1 - this.bonus("armorPierce")));
-              enemy.lastHitByDefinitionId = definition.id;
-              enemy.hp -= areaDamage;
-              applyUniqueAbility(enemy, definition, areaDamage, uniqueLevel, uniqueSkillPowerBonus, this.rng);
-              this.events.push({ type: "damage", attackId, targetId: enemy.id, at: position, amount: areaDamage, critical, rarityTier });
-            }
-          }
-        } else {
-          const bossAdjustedDamage = Math.round(damage * (target.isBoss ? (1 + bossDamageBonus) * (superType==='archer'||superType==='warrior'?5:1) : 1));
-          const magic=weapon&&weapon.level>=7?this.randomInteger(500,50000):0;
-          if(magic)this.events.push({type:'superSkill',skill:'dragon-magic',sourceId:unit.instanceId,at:targetPosition});
-          const reducedDamage = applyArmor(bossAdjustedDamage, target.armor * (1 - this.bonus("armorPierce"))) + magic;
-          target.lastHitByDefinitionId = definition.id;
-          target.hp -= reducedDamage;
-          applyUniqueAbility(target, definition, reducedDamage, uniqueLevel, uniqueSkillPowerBonus, this.rng);
-          this.events.push({ type: "damage", attackId, targetId: target.id, at: targetPosition, amount: reducedDamage, critical, rarityTier });
-        }
-      }
-      if(ring&&this.rng.next()<0.1){
-        const alive=this.enemies.filter(e=>e.hp>0);
-        for(const enemy of alive){const amount=50+ring.bonus;enemy.hp-=amount;enemy.lastHitByDefinitionId=definition.id;this.events.push({type:'damage',targetId:enemy.id,at:getPathPosition(enemy.progress),amount,critical:false,rarityTier});}
-        this.events.push({type:'superSkill',skill:'dragon-ring',sourceId:unit.instanceId,at:origin,targets:alive.map(e=>getPathPosition(e.progress))});
-      }
-    });
-
-    this.collectDefeatedEnemies();
-  }
-
-  private findTargets(unit: { x: number; y: number }, range: number, count: number): EnemyState[] {
-    const origin = { x: unit.x, y: unit.y };
-    return this.enemies
-      .filter((enemy) => {
-        if (enemy.hp <= 0) {
-          return false;
-        }
-        const position = getPathPosition(enemy.progress);
-        return Math.hypot(position.x - origin.x, position.y - origin.y) <= range;
-      })
-      .sort((a, b) => b.progress - a.progress)
-      .slice(0, count);
-  }
-
-  private collectDefeatedEnemies(): void {
-    for (let index = this.enemies.length - 1; index >= 0; index -= 1) {
-      const enemy = this.enemies[index]!;
-      if (enemy.hp > 0) {
-        continue;
-      }
-
-      const position = getPathPosition(enemy.progress);
-      this.enemies.splice(index, 1);
-      const goldBonus = 1 + getSkillEffectTotal(this.meta, "goldBonus") + this.bonus("goldBonus");
-      const goldReward = rollKillGoldReward(Math.round(enemy.rewardGold * goldBonus), this.rng);
-      this.state = {
-        ...this.state,
-        gold: this.state.gold + goldReward.amount,
-        defeatedEnemies: this.state.defeatedEnemies + 1,
-      };
-      this.events.push({ type: "goldReward", at: position, amount: goldReward.amount, tier: goldReward.tier });
-
-      if (enemy.lastHitByDefinitionId) {
-        const killer = getUnitDefinition(enemy.lastHitByDefinitionId);
-        if (isUniqueUnit(killer)) {
-          const experienceAmount = Math.max(
-            1,
-            Math.round(getEnemyExperienceReward(enemy) * (1 + getSkillEffectTotal(this.meta, "uniqueExperienceBonus") + this.bonus("experience"))),
-          );
-          const result = grantUniqueUnitExperience(this.meta, killer.id, experienceAmount);
-          this.meta = result.meta;
-          this.events.push({
-            type: "unitExperience",
-            at: position,
-            definitionId: killer.id,
-            amount: experienceAmount,
-            level: result.level,
-            experience: result.experience,
-            experienceToNext: result.experienceToNext,
-            levelsGained: result.levelsGained,
-          });
-        }
-      }
-
-      const jackpotChance = this.getJackpotChance();
-      if (this.rng.next() < jackpotChance) {
-        const reward = rollJackpotReward(this.rng);
-        this.state = resolveJackpotReward(this.state, reward);
-        this.combatCounters.jackpotMisses = 0;
-        this.events.push({ type: "jackpot", reward, text: describeJackpot(reward) });
-      } else {
-        this.combatCounters.jackpotMisses += 1;
-      }
-    }
-  }
-
-  private tickBuffs(deltaMs: number): void {
-    const activeBuffs = this.state.activeBuffs
-      .map((buff) => ({ ...buff, remainingMs: buff.remainingMs - deltaMs }))
-      .filter((buff) => buff.remainingMs > 0);
-    if (activeBuffs.length !== this.state.activeBuffs.length) {
-      this.state = { ...this.state, activeBuffs };
-    } else {
-      this.state.activeBuffs = activeBuffs;
-    }
-
-    for (const unit of this.state.board) {
-      if ((unit.berserkRemainingMs ?? 0) > 0) {
-        unit.berserkRemainingMs = Math.max(0, unit.berserkRemainingMs! - deltaMs);
-      }
-    }
-  }
-
-  private tickEnemyEffects(deltaMs: number): void {
-    for (const enemy of this.enemies) {
-      const nextEffects: EnemyStatusEffect[] = [];
-      for (const effect of enemy.effects) {
-        const nextEffect = { ...effect, remainingMs: effect.remainingMs - deltaMs };
-        if (nextEffect.kind === "poison") {
-          nextEffect.tickMs = (nextEffect.tickMs ?? POISON_TICK_MS) - deltaMs;
-          while ((nextEffect.tickMs ?? 0) <= 0 && nextEffect.remainingMs > 0) {
-            const poisonDamage = Math.max(1, Math.round(nextEffect.magnitude * (1 + this.bonus("poisonDamage"))));
-            if (nextEffect.sourceDefinitionId) {
-              enemy.lastHitByDefinitionId = nextEffect.sourceDefinitionId;
-            }
-            enemy.hp -= poisonDamage;
-            this.events.push({
-              type: "damage",
-              at: getPathPosition(enemy.progress),
-              amount: poisonDamage,
-              critical: false,
-              rarityTier: getRarityIndex("mythic"),
-            });
-            nextEffect.tickMs = (nextEffect.tickMs ?? 0) + POISON_TICK_MS;
-          }
-        }
-        if (nextEffect.remainingMs > 0) {
-          nextEffects.push(nextEffect);
-        }
-      }
-      enemy.effects = nextEffects;
-    }
-
-    this.collectDefeatedEnemies();
-  }
-
   private tickWaveTimer(deltaMs: number): void {
     if (!this.currentWaveActive) {
       return;
@@ -1159,7 +842,8 @@ export class GameSimulation {
     return best;
   }
 
-  private getBuffMultiplier(stat: "attack" | "attackSpeed"): number {
+  /** 내부 전용. combat.ts가 CombatContext로 접근하므로 private이 아니다. 소비자 API는 아니다. */
+  getBuffMultiplier(stat: "attack" | "attackSpeed"): number {
     return this.state.activeBuffs
       .filter((buff) => buff.stat === stat)
       .reduce((total, buff) => total * buff.multiplier, 1);
@@ -1190,7 +874,8 @@ export class GameSimulation {
     return { unit, pityActivated };
   }
 
-  private getJackpotChance(): number {
+  /** 내부 전용. combat.ts가 CombatContext로 접근하므로 private이 아니다. 소비자 API는 아니다. */
+  getJackpotChance(): number {
     const skillBonus = getSkillEffectTotal(this.meta, "jackpotChance");
     const pityBonus = Math.min(JACKPOT_PITY_MAX_BONUS, this.combatCounters.jackpotMisses * JACKPOT_PITY_STEP);
     return Math.min(0.30, BASE_JACKPOT_CHANCE + skillBonus + pityBonus + this.bonus("jackpotChance")) / 4;
