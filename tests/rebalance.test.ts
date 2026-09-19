@@ -72,3 +72,33 @@ test('retired summon growth refunds once and preserves other progress', () => {
   expect(refunded.unlockedSkills).toEqual(['power-1']);
   expect(refundRetiredSkills(refunded)).toEqual(refunded);
 });
+
+import { buildWaves, createInitialRunState, resolveJackpotReward, rollJackpotReward } from '../src/game/systems';
+
+const fixedRng = (value: number) => ({ next: () => value, pick: <T,>(items: T[]) => items[0]! });
+test('jackpot rewards never grant fractional gold or summons', () => {
+  expect(rollJackpotReward(fixedRng(0.1))).toEqual({ type: 'gold', amount: 9 });
+  expect(rollJackpotReward(fixedRng(0.6))).toEqual({ type: 'freeSummon', amount: 1 });
+  const state = createInitialRunState();
+  expect(resolveJackpotReward(state, { type: 'gold', amount: 8.75 }).gold).toBe(state.gold + 9);
+  expect(resolveJackpotReward(state, { type: 'freeSummon', amount: 0.25 }).freeSummons).toBe(state.freeSummons + 1);
+});
+test('boss tiers use the reduced health multipliers', () => {
+  const waves = buildWaves();
+  const late = (w: number) => (1 + Math.max(0, w - 20) * 0.0325) * 1.006 ** (w - 1);
+  expect(waves[4]!.healthMultiplier).toBeCloseTo(5.6 * late(5));
+  expect(waves[9]!.healthMultiplier).toBeCloseTo((5.6 + 0.95) * 1.5 * late(10));
+  expect(waves[29]!.healthMultiplier).toBeCloseTo((5.6 + 0.95 * 5) * 1.5 * 1.15 * late(30));
+});
+test('spawned mid boss, boss and true boss health drop on normal difficulty', () => {
+  const spawn = (wave: number) => {
+    const sim = new GameSimulation(createDefaultMetaProgress(), createSeededRng(1));
+    sim.state.wave = wave - 1; sim.state.baseHealth = sim.state.maxBaseHealth = 1000; sim.state.board = [];
+    sim.startNextWave(); sim.update(1);
+    return sim.enemies[0]!.maxHp;
+  };
+  expect(spawn(5)).toBeLessThan(1_650);
+  expect(spawn(10)).toBeLessThan(4_350);
+  expect(spawn(30)).toBeLessThan(26_500);
+  expect(spawn(30)).toBeGreaterThan(3_000);
+});

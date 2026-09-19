@@ -55,6 +55,7 @@ export interface WaveDefinition {
   durationMs: number;
   isBoss: boolean;
   isTrueBoss: boolean;
+  bossId?: TrueBossId;
   trueBossId?: TrueBossId;
 }
 

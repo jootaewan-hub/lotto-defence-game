@@ -153,7 +153,7 @@ describe("lotto defence game systems", () => {
     expect(simulation.getMergeableGroups()).toEqual([[0, 1, 2], [3, 4, 5]]);
   });
 
-  test("waves contain 120 rounds with bosses every fifth wave and true bosses every tenth", () => {
+  test("waves contain 120 rounds with bosses every fifth wave and true bosses every thirtieth", () => {
     const waves = buildWaves();
 
     expect(waves).toHaveLength(MAX_WAVES);
@@ -161,13 +161,7 @@ describe("lotto defence game systems", () => {
       Array.from({ length: MAX_WAVES / 5 }, (_, index) => (index + 1) * 5),
     );
     expect(waves.filter((wave) => wave.isTrueBoss).map((wave) => [wave.number, wave.trueBossId])).toEqual([
-      [10, "orc-emperor"],
-      [20, "ogre-king"],
-      [30, "ancient-dragon"],
-      [40, "undead-demon-king"],
-      [50, "orc-emperor"],
-      [60, "ogre-king"],
-      [70, "ancient-dragon"], [80, "undead-demon-king"], [90, "orc-emperor"], [100, "ogre-king"], [110, "ancient-dragon"], [120, "undead-demon-king"],
+      [30, "ancient-dragon"], [60, "ogre-king"], [90, "orc-emperor"], [120, "undead-demon-king"],
     ]);
   });
 
@@ -210,7 +204,7 @@ describe("lotto defence game systems", () => {
       ],
     };
     const initialState = createInitialRunState(progressedMeta);
-    expect(initialState.freeSummons).toBe(3.5);
+    expect(initialState.freeSummons).toBe(4);
     expect(initialState.baseHealth).toBe(30.5);
     expect(initialState.maxBaseHealth).toBe(30.5);
   });
@@ -684,10 +678,10 @@ describe("lotto defence game systems", () => {
 
   test("true boss waves provide seventy-five seconds with a forty-five-second final defeat window", () => {
     const simulation = new GameSimulation(createDefaultMetaProgress(), createSeededRng(19));
-    simulation.state = { ...simulation.state, wave: 9 };
+    simulation.state = { ...simulation.state, wave: 29 };
 
     simulation.startNextWave();
-    const trueBossWave = simulation.waves[9]!;
+    const trueBossWave = simulation.waves[29]!;
 
     expect(trueBossWave.isTrueBoss).toBe(true);
     expect(trueBossWave.durationMs).toBe(75_000);
@@ -697,7 +691,7 @@ describe("lotto defence game systems", () => {
 
     expect(simulation.state.waveTimeRemainingMs).toBe(45_000);
     expect(simulation.enemies).toHaveLength(1);
-    expect(simulation.enemies[0]!.trueBossId).toBe("orc-emperor");
+    expect(simulation.enemies[0]!.trueBossId).toBe("ancient-dragon");
 
     simulation.update(44_999);
 
@@ -741,17 +735,17 @@ describe("lotto defence game systems", () => {
     expect(bossArmor).toBeGreaterThanOrEqual(lateArmor * 5);
   });
 
-  test("every tenth wave spawns a named true boss variant", () => {
+  test("every thirtieth wave spawns a named true boss variant", () => {
     const simulation = new GameSimulation(createDefaultMetaProgress(), createSeededRng(19));
 
-    simulation.state = { ...simulation.state, wave: 9 };
+    simulation.state = { ...simulation.state, wave: 29 };
     simulation.startNextWave();
     simulation.update(1);
 
     expect(simulation.enemies[0]).toMatchObject({
       isBoss: true,
-      trueBossId: "orc-emperor",
-      variantLabel: "오크 황제",
+      trueBossId: "ancient-dragon",
+      variantLabel: "고대 드래곤",
     });
     expect(simulation.enemies[0]!.maxHp).toBeGreaterThan(3_000);
   });
@@ -776,12 +770,12 @@ describe("lotto defence game systems", () => {
   test("true boss waves spawn only one enemy", () => {
     const simulation = new GameSimulation(createDefaultMetaProgress(), createSeededRng(19));
 
-    simulation.state = { ...simulation.state, wave: 9 };
+    simulation.state = { ...simulation.state, wave: 29 };
     simulation.startNextWave();
     simulation.update(15_000);
 
     expect(simulation.enemies).toHaveLength(1);
-    expect(simulation.enemies[0]!.trueBossId).toBe("orc-emperor");
+    expect(simulation.enemies[0]!.trueBossId).toBe("ancient-dragon");
   });
 
   test("kill gold rewards have larger tiers for higher rolls", () => {

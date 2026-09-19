@@ -1,5 +1,5 @@
 import { MAX_TOWERS, MAX_ITEM_UPGRADE_LEVEL, SUPER_COST, DRAGON_ITEMS, getSuperRecipe, getItemUpgradeChance, getItemUpgradeCost } from './superUnits';
-import { DIFFICULTIES } from './waves';
+import { DIFFICULTIES, getEnemyGrowthWave } from './waves';
 import { ULTIMATE_ID, ULTIMATE_COST, getUltimateRecipe } from './ultimate';
 import { rollNormalInteger, sampleRewards, type ExpeditionUpgrades, type RewardDefinition, type UpgradeRoll, type UpgradeStat } from './upgrades';
 import { TOWER_FIELD, TOWER_RADIUS, TOWER_SPAWN, clampTowerPosition, getPathPosition } from "./geometry";
@@ -413,14 +413,15 @@ export class GameSimulation {
     this.state.gold += income;
     this.state.baseHealth = Math.min(this.state.maxBaseHealth, this.state.baseHealth + this.getUpgradeValue('regeneration'));
     this.state = { ...this.state, wave: nextWave, waveTimeRemainingMs: wave.durationMs, status: "running" };
-    this.remainingSpawns = wave.isTrueBoss ? 1 : Number.POSITIVE_INFINITY;
+    this.remainingSpawns = wave.isTrueBoss || wave.bossId ? 1 : Number.POSITIVE_INFINITY;
     this.spawnTimerMs = 0;
     this.currentWaveActive = true;
     this.nextWaveDelayMs = 0;
-    const trueBossName = wave.trueBossId ? getTrueBossDefinition(wave.trueBossId).label : null;
+    const namedBossId = wave.trueBossId ?? wave.bossId;
+    const trueBossName = namedBossId ? getTrueBossDefinition(namedBossId).label : null;
     this.events.push({
       type: "message",
-      text: trueBossName ? `진보스 ${trueBossName} 출현!` : wave.isBoss ? `보스 ${nextWave} 웨이브!` : `${nextWave} 웨이브 시작`,
+      text: trueBossName ? `${wave.isTrueBoss ? '진보스' : '보스'} ${trueBossName} 출현!` : wave.isBoss ? `중간보스 ${nextWave} 웨이브!` : `${nextWave} 웨이브 시작`,
     });
   }
 
@@ -726,7 +727,8 @@ export class GameSimulation {
       const baseHp = wave.isBoss ? 280 : 46;
       const sequence = this.enemySequence + 1;
       const variant = getEnemyVariant(wave.number, wave.isBoss, sequence);
-      const trueBoss = wave.trueBossId ? getTrueBossDefinition(wave.trueBossId) : null;
+      const namedBossId = wave.trueBossId ?? wave.bossId;
+      const trueBoss = namedBossId ? getTrueBossDefinition(namedBossId) : null;
       const hpMultiplier = variant.hpMultiplier * (trueBoss?.hpMultiplier ?? 1);
       const armorMultiplier = variant.armorMultiplier * (trueBoss?.armorMultiplier ?? 1);
       const hp = Math.round(Math.round(baseHp * wave.healthMultiplier * hpMultiplier) * this.difficulty.statMultiplier);
@@ -1391,13 +1393,14 @@ function getEnemyVariant(waveNumber: number, isBoss: boolean, sequence: number):
 }
 
 function getWaveCleanupWindowMs(wave: WaveDefinition | null | undefined): number {
-  if (wave?.isTrueBoss) {
+  if (wave?.isTrueBoss || wave?.bossId) {
     return TRUE_BOSS_WAVE_CLEANUP_WINDOW_MS;
   }
   return wave?.isBoss ? BOSS_WAVE_CLEANUP_WINDOW_MS : NORMAL_WAVE_CLEANUP_WINDOW_MS;
 }
 
 function getWaveArmor(waveNumber: number, isBoss: boolean): number {
+  waveNumber = getEnemyGrowthWave(waveNumber, isBoss);
   const tier = Math.floor((waveNumber - 1) / 5);
   const lateGameArmor = Math.max(0, waveNumber - 30) * 0.6;
   const normalArmor = Math.max(1, Math.floor(waveNumber * 0.4 + tier + lateGameArmor));
@@ -1458,7 +1461,7 @@ function upsertEnemyEffect(enemy: EnemyState, effect: EnemyStatusEffect): void {
 
 export function getEnemyExperienceReward(enemy: Pick<EnemyState, "wave" | "variantTier" | "isBoss" | "trueBossId">): number {
   const baseExperience = 4 + Math.floor((enemy.wave - 1) / 5) + enemy.variantTier * 2;
-  return baseExperience * (enemy.trueBossId ? 12 : enemy.isBoss ? 5 : 1) * 0.5;
+  return baseExperience * (enemy.isBoss && enemy.wave % 10 === 0 ? 12 : enemy.isBoss ? 5 : 1) * 0.5;
 }
 
 function getEnemyMovementMultiplier(enemy: EnemyState): number {

@@ -42,7 +42,7 @@ export function createInitialRunState(meta: MetaProgress = createDefaultMetaProg
     wave: 0,
     waveTimeRemainingMs: 0,
     gold: 100 + getSkillEffectTotal(meta, "startGold"),
-    freeSummons: getSkillEffectTotal(meta, "startFreeSummons"),
+    freeSummons: Math.ceil(getSkillEffectTotal(meta, "startFreeSummons")),
     baseHealth: maxBaseHealth,
     maxBaseHealth,
     board: [],
@@ -100,12 +100,16 @@ export function createMergeCandidates(sourceUnitId: string, rng: Rng): UnitDefin
   return candidates.slice(0, 3);
 }
 
+/** Jackpot payouts are always whole units: gold rounds up, a summon ticket is one full draw. */
+const JACKPOT_GOLD_REWARD = Math.ceil(8.75);
+const JACKPOT_FREE_SUMMON_REWARD = 1;
+
 export function resolveJackpotReward(state: RunState, reward: JackpotReward): RunState {
   if (reward.type === "gold") {
-    return { ...state, gold: state.gold + reward.amount };
+    return { ...state, gold: state.gold + Math.ceil(reward.amount) };
   }
   if (reward.type === "freeSummon") {
-    return { ...state, freeSummons: state.freeSummons + reward.amount };
+    return { ...state, freeSummons: state.freeSummons + Math.ceil(reward.amount) };
   }
 
   return {
@@ -124,10 +128,10 @@ export function resolveJackpotReward(state: RunState, reward: JackpotReward): Ru
 export function rollJackpotReward(rng: Rng): JackpotReward {
   const roll = rng.next();
   if (roll < 0.45) {
-    return { type: "gold", amount: 8.75 };
+    return { type: "gold", amount: JACKPOT_GOLD_REWARD };
   }
   if (roll < 0.75) {
-    return { type: "freeSummon", amount: 0.25 };
+    return { type: "freeSummon", amount: JACKPOT_FREE_SUMMON_REWARD };
   }
   return rng.next() < 0.5
     ? { type: "buff", stat: "attack", multiplier: 1.0875, durationMs: 10_000 }

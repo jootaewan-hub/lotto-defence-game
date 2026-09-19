@@ -9,7 +9,7 @@ import '../src/styles.css';
 const simulation = new GameSimulation(createDefaultMetaProgress(), createSeededRng(12));
 const ui = createUi(simulation, false);
 simulation.state.board = [{instanceId:'hud-tower', definitionId:'rare-single', x:195, y:148, cooldownMs:0}];
-simulation.state.wave = new URLSearchParams(location.search).get('boss') === 'true' ? 9 : 4;
+simulation.state.wave = new URLSearchParams(location.search).get('boss') === 'true' ? 29 : 4;
 simulation.state.difficulty = 'insane';
 simulation.state.baseHealth = simulation.state.maxBaseHealth = 100;
 simulation.startNextWave();
