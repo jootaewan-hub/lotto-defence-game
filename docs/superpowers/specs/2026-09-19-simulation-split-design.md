@@ -52,14 +52,39 @@
 | 새 파일 | 이동 대상 | 원본 행 | 대략 |
 | --- | --- | --- | --- |
 | `enemyVariants.ts` | `EnemyVariantDefinition`, `TrueBossDefinition`, `getTrueBossDefinition`, `getEnemyVariant` | 1233–1394 | ~162줄 |
-| `combatMath.ts` | `scaleEnemyReward`, `getWaveCleanupWindowMs`, `getWaveArmor`, `applyArmor`, `applyUniqueAbility`, `upsertEnemyEffect`, `getEnemyExperienceReward`, `getEnemyMovementMultiplier` | 1229, 1395–1477 | ~87줄 |
+| `combatMath.ts` | `describeJackpot`, `scaleEnemyReward`, `getWaveCleanupWindowMs`, `getWaveArmor`, `applyArmor`, `applyUniqueAbility`, `upsertEnemyEffect`, `getEnemyExperienceReward`, `getEnemyMovementMultiplier`, 그리고 이들만 쓰는 상수 4개 | 1219–1232, 1395–1477, 106–109 | ~101줄 |
 | `towerArrangement.ts` | `compareUnitsForArrangement`, `createTowerEdgeCandidates` | 1478–1520 | ~43줄 |
-| `combat.ts` | `CombatContext`, `spawnEnemies`, `moveEnemies`, `attackEnemies`, `findTargets`, `collectDefeatedEnemies`, `tickBuffs`, `tickEnemyEffects` | 712–1016 | ~305줄 |
+| `combat.ts` | `CombatContext`, `spawnEnemies`, `moveEnemies`, `attackEnemies`, `findTargets`, `collectDefeatedEnemies`, `tickBuffs`, `tickEnemyEffects`, 그리고 이들만 쓰는 상수 3개 | 712–1016, 104–105, 111 | ~308줄 |
 
-`describeJackpot`(1219–1228, 10줄)은 잭팟 문구 생성이며 소환·보상 흐름에 묶여 있다. 10줄을 위해
-파일을 만들지 않고 `simulation.ts`에 남긴다.
+`describeJackpot`(1219–1228)은 당초 `simulation.ts`에 남길 예정이었으나 정정한다. 유일한 호출부가
+960행, 즉 이동 대상인 전투 구간 안이다. `simulation.ts`에 남기면 `simulation → combat → simulation`
+순환 import가 생기므로 `combatMath.ts`로 옮긴다.
 
-분리 후 `simulation.ts`는 약 920줄이 된다. 이동 합계는 162 + 87 + 43 + 305 = 597줄이고, 1,520 − 597 = 923줄에서 import 구문 증감을 더한 값이다.
+모듈 상수도 사용 범위에 따라 함께 이동한다. `NORMAL_SPAWN_DENSITY`(104행),
+`BOSS_SPAWN_INTERVAL_MS`(105행), `POISON_TICK_MS`(111행)는 전투 구간에서만 쓰이므로 `combat.ts`로,
+`ENEMY_GOLD_REWARD_SCALE`(106행)과 웨이브 정리 시간 상수 3개(107–109행)는 이동 대상 함수 안에서만
+쓰이므로 `combatMath.ts`로 옮긴다. 소환·잭팟 확률 관련 상수(96–103, 112–113행)는 `rollSummonUnit`과
+`getJackpotChance`가 쓰며 둘 다 잔존하므로 `simulation.ts`에 남는다.
+
+분리 후 `simulation.ts`는 약 920줄이 된다. 이동 합계는 162 + 101 + 43 + 308 = 614줄이고,
+1,520 − 614 = 906줄에 새 import 구문을 더한 값이다.
+
+#### 4.1.1 순환 import 없음 확인
+
+호출자를 전수 조사한 결과 의존 방향은 단방향이다.
+
+- `enemyVariants.ts` → 외부 의존 없음(타입만). `getTrueBossDefinition`은 `simulation.ts:421`과
+  전투 구간 `731`행 양쪽에서 쓰이므로 두 파일이 모두 import한다.
+- `combatMath.ts` → `enemyVariants.ts`에 의존하지 않는다. `getWaveCleanupWindowMs`는
+  `simulation.ts:380`과 전투 구간 `718`행 양쪽에서 쓰인다.
+- `towerArrangement.ts` → `simulation.ts`만 사용한다(`530`, `531`, `1130`행).
+- `combat.ts` → `enemyVariants.ts`, `combatMath.ts`에 의존한다.
+- `simulation.ts` → 위 네 파일 전부에 의존한다.
+
+`combat.ts`는 `SimulationEvent` 타입이 필요한데 이 타입은 `simulation.ts`에 있다. `import type`은
+컴파일 시 지워져 런타임 순환을 만들지 않으며, `CombatEffects.ts:3`이 이미 같은 방식을 쓴다. 따라서
+`SimulationEvent`를 `types.ts`로 옮기지 않고 `import type`으로 참조한다 — 옮기면 `GameScene`·`ui`·
+`CombatEffects`의 import 경로가 바뀌어 "소비자 무변경" 기준을 깬다.
 
 `getEnemyExperienceReward`는 현재 `simulation.ts`에서 export되며 `tests/game-systems.test.ts`가
 직접 import한다. 테스트 무수정 원칙에 따라 `combatMath.ts`로 옮긴 뒤 `simulation.ts`에서
