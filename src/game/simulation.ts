@@ -312,17 +312,20 @@ export class GameSimulation {
 
   private readonly rng: Rng;
   private readonly events: SimulationEvent[] = [];
-  private enemySequence = 0;
-  private attackSequence = 0;
   private unitSequence = 0;
-  private remainingSpawns = 0;
-  private spawnTimerMs = 0;
   private currentWaveActive = false;
   private nextWaveDelayMs = 0;
   private successfulSummons = 0;
   private rareDrySummons = 0;
   private epicDrySummons = 0;
-  private jackpotMisses = 0;
+  /** 내부 전용. combat.ts의 CombatContext가 읽고 쓰므로 private을 붙이지 않는다. */
+  combatCounters = {
+    enemySequence: 0,
+    attackSequence: 0,
+    remainingSpawns: 0,
+    spawnTimerMs: 0,
+    jackpotMisses: 0,
+  };
 
   constructor(meta: MetaProgress, rng: Rng = createRandomRng()) {
     this.meta = meta;
@@ -344,17 +347,17 @@ export class GameSimulation {
     this.pendingRoll = null;
     this.rewardHistory = [];
     this.frostCooldownMs = 0;
-    this.enemySequence = 0;
-    this.attackSequence = 0;
+    this.combatCounters.enemySequence = 0;
+    this.combatCounters.attackSequence = 0;
     this.unitSequence = 0;
-    this.remainingSpawns = 0;
-    this.spawnTimerMs = 0;
+    this.combatCounters.remainingSpawns = 0;
+    this.combatCounters.spawnTimerMs = 0;
     this.currentWaveActive = false;
     this.nextWaveDelayMs = 0;
     this.successfulSummons = 0;
     this.rareDrySummons = 0;
     this.epicDrySummons = 0;
-    this.jackpotMisses = 0;
+    this.combatCounters.jackpotMisses = 0;
     this.state = createInitialRunState(this.meta);
     this.events.push({ type: "message", text: "새로운 방어를 시작합니다." });
     return true;
@@ -420,8 +423,8 @@ export class GameSimulation {
     this.state.gold += income;
     this.state.baseHealth = Math.min(this.state.maxBaseHealth, this.state.baseHealth + this.getUpgradeValue('regeneration'));
     this.state = { ...this.state, wave: nextWave, waveTimeRemainingMs: wave.durationMs, status: "running" };
-    this.remainingSpawns = wave.isTrueBoss || wave.bossId ? 1 : Number.POSITIVE_INFINITY;
-    this.spawnTimerMs = 0;
+    this.combatCounters.remainingSpawns = wave.isTrueBoss || wave.bossId ? 1 : Number.POSITIVE_INFINITY;
+    this.combatCounters.spawnTimerMs = 0;
     this.currentWaveActive = true;
     this.nextWaveDelayMs = 0;
     const namedBossId = wave.trueBossId ?? wave.bossId;
@@ -717,7 +720,7 @@ export class GameSimulation {
   }
 
   private spawnEnemies(deltaMs: number): void {
-    if (!this.currentWaveActive || this.remainingSpawns <= 0) {
+    if (!this.currentWaveActive || this.combatCounters.remainingSpawns <= 0) {
       return;
     }
 
@@ -728,11 +731,11 @@ export class GameSimulation {
       return;
     }
 
-    this.spawnTimerMs -= spawnableDeltaMs;
+    this.combatCounters.spawnTimerMs -= spawnableDeltaMs;
 
-    while (this.remainingSpawns > 0 && this.spawnTimerMs <= 0) {
+    while (this.combatCounters.remainingSpawns > 0 && this.combatCounters.spawnTimerMs <= 0) {
       const baseHp = wave.isBoss ? 280 : 46;
-      const sequence = this.enemySequence + 1;
+      const sequence = this.combatCounters.enemySequence + 1;
       const variant = getEnemyVariant(wave.number, wave.isBoss, sequence);
       const namedBossId = wave.trueBossId ?? wave.bossId;
       const trueBoss = namedBossId ? getTrueBossDefinition(namedBossId) : null;
@@ -743,7 +746,7 @@ export class GameSimulation {
       // Double each spawn batch, including bosses, without changing wave timing.
       for (let copy = 0; copy < this.difficulty.spawnMultiplier; copy += 1) {
         this.enemies.push({
-          id: `enemy-${this.enemySequence += 1}`,
+          id: `enemy-${this.combatCounters.enemySequence += 1}`,
           wave: wave.number,
           variantId: trueBoss?.variantId ?? variant.id,
           variantLabel: trueBoss?.label ?? variant.label,
@@ -770,8 +773,8 @@ export class GameSimulation {
       });
       }
 
-      this.remainingSpawns -= 1;
-      this.spawnTimerMs += wave.isBoss ? BOSS_SPAWN_INTERVAL_MS : Math.max(180, Math.floor(wave.durationMs / (wave.enemyCount * NORMAL_SPAWN_DENSITY)));
+      this.combatCounters.remainingSpawns -= 1;
+      this.combatCounters.spawnTimerMs += wave.isBoss ? BOSS_SPAWN_INTERVAL_MS : Math.max(180, Math.floor(wave.durationMs / (wave.enemyCount * NORMAL_SPAWN_DENSITY)));
     }
   }
 
@@ -853,7 +856,7 @@ export class GameSimulation {
 
       for (const target of targets) {
         const targetPosition = getPathPosition(target.progress);
-        const attackId = `attack-${++this.attackSequence}`;
+        const attackId = `attack-${++this.combatCounters.attackSequence}`;
         this.events.push({
           type: "attack",
           attackId,
@@ -963,10 +966,10 @@ export class GameSimulation {
       if (this.rng.next() < jackpotChance) {
         const reward = rollJackpotReward(this.rng);
         this.state = resolveJackpotReward(this.state, reward);
-        this.jackpotMisses = 0;
+        this.combatCounters.jackpotMisses = 0;
         this.events.push({ type: "jackpot", reward, text: describeJackpot(reward) });
       } else {
-        this.jackpotMisses += 1;
+        this.combatCounters.jackpotMisses += 1;
       }
     }
   }
@@ -1034,7 +1037,7 @@ export class GameSimulation {
   }
 
   private checkWaveCompletion(): void {
-    if (!this.currentWaveActive || this.remainingSpawns > 0 || this.enemies.length > 0 || this.state.waveTimeRemainingMs > 0) {
+    if (!this.currentWaveActive || this.combatCounters.remainingSpawns > 0 || this.enemies.length > 0 || this.state.waveTimeRemainingMs > 0) {
       return;
     }
     this.completeCurrentWave();
@@ -1051,7 +1054,7 @@ export class GameSimulation {
     const damageReduction = Math.min(0.8, getSkillEffectTotal(this.meta, "leakDamageReduction") + this.bonus("damageReduction"));
     const survivorDamage = rawSurvivorDamage > 0 ? Math.max(1, Math.ceil(rawSurvivorDamage * (1 - damageReduction))) : 0;
     this.enemies.splice(0);
-    this.remainingSpawns = 0;
+    this.combatCounters.remainingSpawns = 0;
     const baseHealth = Math.max(0, this.state.baseHealth - survivorDamage);
     this.state = { ...this.state, baseHealth };
     if (survivorDamage > 0) {
@@ -1189,7 +1192,7 @@ export class GameSimulation {
 
   private getJackpotChance(): number {
     const skillBonus = getSkillEffectTotal(this.meta, "jackpotChance");
-    const pityBonus = Math.min(JACKPOT_PITY_MAX_BONUS, this.jackpotMisses * JACKPOT_PITY_STEP);
+    const pityBonus = Math.min(JACKPOT_PITY_MAX_BONUS, this.combatCounters.jackpotMisses * JACKPOT_PITY_STEP);
     return Math.min(0.30, BASE_JACKPOT_CHANCE + skillBonus + pityBonus + this.bonus("jackpotChance")) / 4;
   }
 
@@ -1207,7 +1210,7 @@ export class GameSimulation {
           )
         : 0;
     this.currentWaveActive = false;
-    this.remainingSpawns = 0;
+    this.combatCounters.remainingSpawns = 0;
     this.state = {
       ...this.state,
       status,
