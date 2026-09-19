@@ -1,4 +1,4 @@
-import { createDefaultMetaProgress } from "./skills";
+import { createDefaultMetaProgress, refundRetiredSkills } from "./skills";
 import type { MetaProgress } from "./types";
 
 const STORAGE_KEY = "lotto-defence-meta-v1";
@@ -10,7 +10,7 @@ export function loadMetaProgress(): MetaProgress {
       return createDefaultMetaProgress();
     }
     const parsed = JSON.parse(raw) as Partial<MetaProgress>;
-    return normalizeMetaProgress(parsed);
+    return refundRetiredSkills(normalizeMetaProgress(parsed));
   } catch {
     return createDefaultMetaProgress();
   }
@@ -48,7 +48,7 @@ function normalizeUniqueLevels(value: unknown): Record<string, number> {
 
   const levels: Record<string, number> = {};
   for (const [unitId, level] of Object.entries(value)) {
-    const normalizedLevel = Math.max(1, Math.min(99, toNonNegativeInteger(level)));
+    const normalizedLevel = Math.max(1, Math.min(999, toNonNegativeInteger(level)));
     if (normalizedLevel > 0) {
       levels[unitId] = normalizedLevel;
     }

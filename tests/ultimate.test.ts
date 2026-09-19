@@ -58,11 +58,11 @@ test('ultimate berserk and global aura apply only in combat, without stacking we
   const sim=game(); sim.state.board=[{instanceId:'u',definitionId:'ultimate-mugeuk',x:150,y:148,cooldownMs:1e9},{instanceId:'n',definitionId:'common-single',x:150,y:148,cooldownMs:1e9}];
   const own=sim.getTowerCombatStats(0)!, ally=sim.getTowerCombatStats(1)!;
   sim.startNextWave();
-  expect(sim.getTowerCombatStats(0)!.attack).toBeCloseTo(own.attack*4.5);
-  expect(sim.getTowerCombatStats(1)!.attack).toBeCloseTo(ally.attack*1.5);
-  expect(sim.getTowerCombatStats(1)!.attackSpeed).toBeCloseTo(ally.attackSpeed/1.5);
+  expect(sim.getTowerCombatStats(0)!.attack).toBeCloseTo(own.attack*2.5);
+  expect(sim.getTowerCombatStats(1)!.attack).toBeCloseTo(ally.attack*1.25);
+  expect(sim.getTowerCombatStats(1)!.attackSpeed).toBeCloseTo(ally.attackSpeed/1.25);
   sim.state.board.push({instanceId:'p',definitionId:'super-priest',x:150,y:148,cooldownMs:1e9});
-  expect(sim.getTowerCombatStats(1)!.attack).toBeCloseTo(ally.attack*1.5);
+  expect(sim.getTowerCombatStats(1)!.attack).toBeCloseTo(ally.attack*1.25);
   sim.update(6000); expect(sim.isSuperBerserk(sim.state.board[0]!)).toBe(false);
   sim.update(4000); expect(sim.isSuperBerserk(sim.state.board[0]!)).toBe(true);
 });
@@ -72,7 +72,7 @@ test('heaven split hits distant armored enemies, doubles boss damage, and respec
   sim.startNextWave(); sim.update(1); sim.enemies.splice(0); sim.drainEvents();
   sim.state.board[0]!.ultimateCooldownMs=0;
   const normal=enemy('n'), boss=enemy('b',true); sim.enemies.push(normal,boss);
-  const damage=Math.round(sim.getTowerCombatStats(0)!.attack*12);
+  const damage=Math.round(sim.getTowerCombatStats(0)!.attack*6);
   sim.update(1);
   expect(normal.maxHp-normal.hp).toBe(damage); expect(boss.maxHp-boss.hp).toBe(damage*2);
   expect(sim.drainEvents()).toContainEqual(expect.objectContaining({type:'superSkill',skill:'heaven-split'}));

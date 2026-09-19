@@ -71,6 +71,6 @@ export function formatUniqueAbilityStats(ability: UnitAbilityKind, level: number
 }
 
 function getUniqueAbilityStep(level: number): number {
-  const normalizedLevel = Math.max(1, Math.min(99, Math.floor(level)));
+  const normalizedLevel = Math.max(1, Math.min(999, Math.floor(level)));
   return Math.floor(normalizedLevel / 5);
 }

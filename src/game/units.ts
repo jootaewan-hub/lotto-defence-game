@@ -36,7 +36,7 @@ const roleBlueprints: Record<
 };
 
 const roleOrder: UnitRole[] = ["single", "area", "support"];
-export const UNIQUE_UNIT_MAX_LEVEL = 99;
+export const UNIQUE_UNIT_MAX_LEVEL = 999;
 
 export const UNIT_DEFINITIONS: UnitDefinition[] = RARITIES.flatMap((rarity) =>
   [...roleOrder.map((role) => createUnit(rarity.id, role)), { ...createUnit(rarity.id, "single"), id: `${rarity.id}-archer`, name: `${rarity.label} 궁수`, towerType: "archer" as const, attackType: "관통 화살", range: 154, skill: "먼 거리의 선두 적에게 집중 사격" }],
@@ -109,10 +109,10 @@ export const UNIT_DEFINITIONS: UnitDefinition[] = RARITIES.flatMap((rarity) =>
 ]);
 
 export const SUPER_SKILLS: Record<TowerType, string> = {
-  archer: '천궁 오연사: 적 5명 동시 타격, 보스 피해 5배',
-  warrior: '검성검기: 적 5명 동시 타격, 보스 피해 5배',
-  mage: '종말의 화염: 공격마다 맵 전체 적에게 화염 피해',
-  priest: '천상의 축복: 모든 타워 공격력·공격속도 +30%, 10초 유지 후 5초 대기',
+  archer: '천궁 오연사: 적 5명 동시 타격, 타격 피해 25%, 보스 피해 5배',
+  warrior: '검성검기: 적 5명 동시 타격, 타격 피해 25%, 보스 피해 5배',
+  mage: '종말의 화염: 공격마다 맵 전체 적에게 공격력 25% 화염 피해',
+  priest: '천상의 축복: 모든 타워 공격력·공격속도 +7.5%, 10초 유지 후 5초 대기',
 };
 for (const [towerType, name, role, attack, attackSpeed, range] of [
   ['archer', '천궁 아스트라', 'single', 380, 620, 200],
@@ -120,7 +120,7 @@ for (const [towerType, name, role, attack, attackSpeed, range] of [
   ['mage', '화신 이그니스', 'area', 300, 1400, 9999],
   ['priest', '성좌 세라피엘', 'support', 280, 850, 195],
 ] as const) {
-  UNIT_DEFINITIONS.push({id: `super-${towerType}`, name, towerType, superUnique: true, rarity: 'immortal', role, attack, attackSpeed, range, criticalChance: 0.2, attackType: '슈퍼유니크 전용 공격', skill: `${SUPER_SKILLS[towerType]} / 광폭화: 5초간 공격력·공격속도 2배, 종료 후 3초 대기`});
+  UNIT_DEFINITIONS.push({id: `super-${towerType}`, name, towerType, superUnique: true, rarity: 'immortal', role, attack, attackSpeed, range, criticalChance: 0.2, attackType: '슈퍼유니크 전용 공격', skill: `${SUPER_SKILLS[towerType]} / 광폭화: 5초간 공격력·공격속도 1.25배, 종료 후 3초 대기`});
 }
 UNIT_DEFINITIONS.push({ id: ULTIMATE_ID, name: '무극신', ultimate: true, superUnique: true, towerType: 'warrior', rarity: 'immortal', role: 'single', attack: 1600, attackSpeed: 850, range: 260, criticalChance: .25, attackType: '무극 검기 · 5명 동시 타격', skill: ULTIMATE_SKILLS.map(s => `${s.name}: ${s.description}`).join(' / ') });
 const UNITS_BY_ID = new Map(UNIT_DEFINITIONS.map(unit => [unit.id, unit]));

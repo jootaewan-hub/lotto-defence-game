@@ -69,7 +69,7 @@ describe('random blessings and gold forging', () => {
         expect(rollNormalInteger({ next: () => 0 }, 1, 20)).toBe(1);
         expect(rollNormalInteger({ next: () => 0.9999999 }, 1, 20)).toBe(20);
     });
-    test('26 distinct upgrades yield varied offers without duplicate cards or capped stats', () => {
+    test('25 distinct upgrades yield varied offers without duplicate cards or capped stats', () => {
         expect(REWARD_POOL.length).toBeGreaterThanOrEqual(20);
         expect(new Set(REWARD_POOL.map(r => r.stat)).size).toBe(REWARD_POOL.length);
         const rng = createSeededRng(9), seen = new Set();
@@ -83,15 +83,15 @@ describe('random blessings and gold forging', () => {
         const capped = Object.fromEntries(REWARD_POOL.filter(r => r.stat !== 'attack').map(r => [r.stat, r.cap]));
         expect(sampleRewards(rng, capped).every(r => r.stat === 'attack')).toBe(true);
     });
-    test('every fifth cleared wave offers locked choices and rolling consumes no duplicate reward', () => {
+    test('every tenth cleared wave offers locked choices and rolling consumes no duplicate reward', () => {
         const sim = game();
-        sim.state.wave=4; sim.state.baseHealth=100; sim.state.maxBaseHealth=100; sim.startNextWave();
-        sim.update(sim.waves[4]!.durationMs);
+        sim.state.wave=9; sim.state.baseHealth=100; sim.state.maxBaseHealth=100; sim.startNextWave();
+        sim.update(sim.waves[9]!.durationMs);
         expect(sim.pendingReward).toBe(true);
         expect(sim.rewardChoices).toHaveLength(3);
         const choices = sim.rewardChoices.map(c => c.id);
         sim.update(100000);
-        expect(sim.state.wave).toBe(5);
+        expect(sim.state.wave).toBe(10);
         expect(sim.rewardChoices.map(c => c.id)).toEqual(choices);
         expect(sim.rollReward('not-offered')).toBeNull();
         const roll = sim.rollReward(choices[0]!)!;
@@ -102,7 +102,7 @@ describe('random blessings and gold forging', () => {
         expect(sim.getUpgradeValue(roll.stat)).toBe(roll.value);
         expect(sim.resolveUpgradeRoll()).toBe(false);
         sim.update(5000);
-        expect(sim.state.wave).toBe(6);
+        expect(sim.state.wave).toBe(11);
     });
     test('a full board can spend gold repeatedly to increase a selected tower attack', () => {
         const sim = game();

@@ -10,8 +10,8 @@ export const DIFFICULTIES: Record<RunState['difficulty'], {
 }> = {
   normal: { label: '보통', statMultiplier: 1, spawnMultiplier: 1, next: 'nightmare' },
   nightmare: { label: '나이트메어', statMultiplier: 1.5, spawnMultiplier: 1, next: 'hell' },
-  hell: { label: '헬', statMultiplier: 2.5, spawnMultiplier: 1, next: 'insane' },
-  insane: { label: 'Insane', statMultiplier: 4, spawnMultiplier: 2, next: null },
+  hell: { label: '헬', statMultiplier: 2, spawnMultiplier: 1, next: 'insane' },
+  insane: { label: 'Insane', statMultiplier: 3, spawnMultiplier: 2, next: null },
 };
 
 export function buildWaves(): WaveDefinition[] {
@@ -20,8 +20,8 @@ export function buildWaves(): WaveDefinition[] {
     const isBoss = number % 5 === 0;
     const isTrueBoss = number % 10 === 0;
     const tier = Math.floor((number - 1) / 5);
-    const lateGameHealthMultiplier = 1 + Math.max(0, number - 30) * 0.035;
-    const baseHealthMultiplier = isTrueBoss ? (8 + tier * 2.7) * 1.75 : isBoss ? 8 + tier * 2.7 : 1 + number * 0.18;
+    const lateGameHealthMultiplier = (1 + Math.max(0, number - 20) * 0.0325) * Math.pow(1.006, number - 1);
+    const baseHealthMultiplier = isTrueBoss ? (8 + tier * 1.35) * 1.75 : isBoss ? 8 + tier * 1.35 : 1 + number * 0.09;
 
     return {
       number,
@@ -30,7 +30,7 @@ export function buildWaves(): WaveDefinition[] {
       trueBossId: isTrueBoss ? getTrueBossId(number) : undefined,
       enemyCount: isBoss ? 1 : 10 + tier * 2 + (number % 5),
       healthMultiplier: baseHealthMultiplier * lateGameHealthMultiplier,
-      speedMultiplier: isTrueBoss ? 0.7 + tier * 0.02 : isBoss ? 0.75 + tier * 0.03 : 1 + tier * 0.035,
+      speedMultiplier: isTrueBoss ? 0.7 + tier * 0.01 : isBoss ? 0.75 + tier * 0.015 : 1 + tier * 0.0175,
       durationMs: isTrueBoss ? 75_000 : isBoss ? 50_000 : 28_000 + tier * 2_000,
     };
   });

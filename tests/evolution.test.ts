@@ -40,6 +40,6 @@ test('gallery covers all four classes and nine tiers, with separate super awaken
   const gallery = evolutionGalleryMarkup();
   expect(gallery.match(/9단계 · 불멸/g)).toHaveLength(4);
   expect(gallery.match(/별도 조합 · 최종 각성/g)).toHaveLength(4);
-  expect(gallery).toContain('에픽 3');
+  expect(gallery).toContain('불멸 3');
   expect(gallery).not.toContain('super-archer.png');
 });

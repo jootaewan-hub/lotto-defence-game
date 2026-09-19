@@ -16,14 +16,14 @@ export const skillTracks: SkillTrack[] = [
     label: "공격력",
     stat: "attackBonus",
     values: [0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.11],
-    describe: (value) => `모든 유닛 공격력 +${Math.round(value * 100)}%`,
+    describe: (value) => `모든 유닛 공격력 +${Number((value * 100).toFixed(2))}%`,
   },
   {
     id: "haste",
     label: "공격속도",
     stat: "attackSpeedBonus",
     values: [0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.1],
-    describe: (value) => `모든 유닛 공격속도 +${Math.round(value * 100)}%`,
+    describe: (value) => `모든 유닛 공격속도 +${Number((value * 100).toFixed(2))}%`,
   },
   {
     id: "critical",
@@ -44,7 +44,7 @@ export const skillTracks: SkillTrack[] = [
     label: "처치 골드",
     stat: "goldBonus",
     values: [0.04, 0.05, 0.06, 0.07, 0.08, 0.1, 0.12],
-    describe: (value) => `몬스터 처치 골드 +${Math.round(value * 100)}%`,
+    describe: (value) => `몬스터 처치 골드 +${Number((value * 100).toFixed(2))}%`,
   },
   {
     id: "summonCost",
@@ -68,13 +68,6 @@ export const skillTracks: SkillTrack[] = [
     describe: (value) => `잭팟 확률 +${(value * 100).toFixed(1)}%p`,
   },
   {
-    id: "uniqueChance",
-    label: "유니크 확률",
-    stat: "uniqueSummonBonus",
-    values: [0.05, 0.07, 0.09, 0.12, 0.15, 0.2, 0.3],
-    describe: (value) => `유니크 기본 확률 대비 +${Math.round(value * 100)}%`,
-  },
-  {
     id: "baseHealth",
     label: "기지 HP",
     stat: "baseHealthBonus",
@@ -86,23 +79,28 @@ export const skillTracks: SkillTrack[] = [
     label: "유니크 경험치",
     stat: "uniqueExperienceBonus",
     values: [0.05, 0.07, 0.09, 0.12, 0.15, 0.2, 0.3],
-    describe: (value) => `유니크 처치 경험치 +${Math.round(value * 100)}%`,
+    describe: (value) => `유니크 처치 경험치 +${Number((value * 100).toFixed(2))}%`,
   },
   {
     id: "uniqueAttack",
     label: "유니크 공격력",
     stat: "uniqueAttackBonus",
     values: [0.03, 0.04, 0.05, 0.06, 0.08, 0.1, 0.14],
-    describe: (value) => `유니크 기본 공격력 +${Math.round(value * 100)}%`,
+    describe: (value) => `유니크 기본 공격력 +${Number((value * 100).toFixed(2))}%`,
   },
   {
     id: "skillPower",
     label: "스킬 공격력",
     stat: "uniqueSkillPowerBonus",
     values: [0.04, 0.05, 0.06, 0.08, 0.1, 0.13, 0.18],
-    describe: (value) => `유니크 공격 스킬 피해 +${Math.round(value * 100)}%`,
+    describe: (value) => `유니크 공격 스킬 피해 +${Number((value * 100).toFixed(2))}%`,
   },
 ];
+
+for (const track of skillTracks) {
+  const original = [...track.values];
+  track.values = Array.from({length: 20}, (_, i) => original[Math.min(i, original.length - 1)]! / 4);
+}
 
 export const skillTree: SkillNode[] = skillTracks.flatMap((track) =>
   track.values.map((value, index) => ({
@@ -111,7 +109,7 @@ export const skillTree: SkillNode[] = skillTracks.flatMap((track) =>
     tier: index + 1,
     label: `${index + 1}단계 강화`,
     description: track.describe(value),
-    cost: SKILL_LEVEL_COSTS[index]!,
+    cost: SKILL_LEVEL_COSTS[index] ?? 9 + (index - 6) * 2,
     prerequisite: index > 0 ? `${track.id}-${index}` : undefined,
     effect: { stat: track.stat, value },
   })),
@@ -156,6 +154,15 @@ export function createDefaultMetaProgress(): MetaProgress {
   };
 }
 
+/** Retired summon upgrades are refunded once; persisted IDs are removed. */
+export function refundRetiredSkills(meta: MetaProgress): MetaProgress {
+  const retired = [...new Set(meta.unlockedSkills)].filter(id => /^uniqueChance-[1-7]$/.test(id));
+  return { ...meta,
+    growthShards: meta.growthShards + retired.reduce((sum, id) => sum + SKILL_LEVEL_COSTS[Number(id.split('-')[1]) - 1]!, 0),
+    unlockedSkills: meta.unlockedSkills.filter(id => !retired.includes(id)),
+  };
+}
+
 export function purchaseSkill(meta: MetaProgress, skillId: string): MetaProgress {
   const node = skillTree.find((entry) => entry.id === skillId);
   if (!node) {
@@ -182,6 +189,6 @@ export function getSkillEffectTotal(meta: MetaProgress, stat: SkillNode["effect"
   return meta.unlockedSkills.reduce((total, skillId) => {
     const node = skillTree.find((entry) => entry.id === skillId);
     const effect = node?.effect ?? LEGACY_SKILL_EFFECTS[skillId];
-    return effect?.stat === stat ? total + effect.value : total;
+    return effect?.stat === stat ? total + effect.value * (node ? 1 : 0.25) : total;
   }, 0);
 }

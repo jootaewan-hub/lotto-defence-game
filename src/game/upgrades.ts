@@ -27,7 +27,7 @@ export interface UpgradeRoll {
     cost?: number;
 }
 function reward(stat: UpgradeStat, title: string, label: string, description: string, min: number, max: number, unit: string, cap: number, category: RewardDefinition['category'], icon: string): RewardDefinition {
-    return { id: stat, stat, title, label, description, min, max, unit, cap, category, icon };
+    return { id: stat, stat, title, label, description, min: stat === 'attack' ? 0.2 : min / 4, max: max / 4, unit, cap, category, icon };
 }
 export const REWARD_POOL: readonly RewardDefinition[] = [
     reward('attack', '달의 축복', '전체 공격력', '모든 수호자의 기본 공격을 강화합니다.', 1, 20, '%', 10000, '공격', 'swords'),
@@ -54,15 +54,18 @@ export const REWARD_POOL: readonly RewardDefinition[] = [
     reward('frostDuration', '긴 겨울', '결계 지속시간', '직접 사용하는 달빛 결계의 빙결 시간이 늘어납니다.', 1, 15, '%', 150, '전술', 'snow'),
     reward('frostCooldown', '시간의 모래', '결계 재사용 감소', '달빛 결계를 더 자주 사용할 수 있습니다.', 1, 8, '%', 60, '전술', 'snow'),
     reward('experience', '별의 기억', '유니크 경험치', '유니크 수호자의 처치 경험치가 증가합니다.', 1, 20, '%', 200, '전술', 'book'),
-    reward('jackpotChance', '행운의 문장', '잭팟 확률', '처치 시 잭팟 확률을 더합니다. 전체 확률 최대 30%.', 1, 3, '%p', 15, '경제', 'diamond'),
-    reward('uniqueChance', '신화의 부름', '유니크 소환 보정', '고급 소환의 유니크 출현 확률에 배율 보너스를 더합니다.', 1, 15, '%', 150, '경제', 'star'),
+    reward('jackpotChance', '행운의 문장', '잭팟 확률 보정', '기본 확률 보정에 더한 후 1/4 배율이 적용됩니다. 최종 확률 최대 7.5%.', 1, 3, '%p', 15, '경제', 'diamond'),
 ];
 /** Discrete truncated Gaussian: integer faces, center=(min+max)/2, sigma=(max-min)/5. */
 export function normalDiceDistribution(min: number, max: number): {
     value: number;
     probability: number;
 }[] {
-    if (!Number.isInteger(min) || !Number.isInteger(max) || max < min)
+    if (!Number.isInteger(min) || !Number.isInteger(max)) {
+        const scale = 100;
+        return normalDiceDistribution(Math.round(min * scale), Math.round(max * scale)).map(d => ({value: d.value / scale, probability: d.probability}));
+    }
+    if (max < min)
         throw new Error('Invalid dice bounds');
     const mean = (min + max) / 2, sigma = Math.max(0.8, (max - min) / 5);
     const values = Array.from({ length: max - min + 1 }, (_, i) => ({ value: min + i, probability: Math.exp(-0.5 * ((min + i - mean) / sigma) ** 2) }));
@@ -80,7 +83,7 @@ export function rollNormalInteger(rng: Pick<Rng, 'next'>, min: number, max: numb
     return max;
 }
 export function sampleRewards(rng: Pick<Rng, 'next'>, upgrades: ExpeditionUpgrades): RewardDefinition[] {
-    const eligible = REWARD_POOL.filter(r => (upgrades[r.stat] ?? 0) < r.cap);
+    const eligible = REWARD_POOL.filter(r => r.stat !== 'uniqueChance' && (upgrades[r.stat] ?? 0) < r.cap);
     for (let i = eligible.length - 1; i > 0; i--) {
         const j = Math.max(0, Math.min(i, Math.floor(rng.next() * (i + 1))));
         [eligible[i], eligible[j]] = [eligible[j]!, eligible[i]!];

@@ -1,15 +1,22 @@
 import { normalDiceDistribution, type UpgradeRoll } from './game/upgrades';
+function rouletteFaces(roll: UpgradeRoll): number[] {
+    const faces = Array.from({length: 20}, (_, i) => Number((roll.min + (roll.max - roll.min) * i / 19).toFixed(2)));
+    const closest = faces.reduce((best, value, i) => Math.abs(value - roll.value) < Math.abs(faces[best]! - roll.value) ? i : best, 0);
+    faces[closest] = roll.value;
+    return faces;
+}
 function rouletteMarkup(roll: UpgradeRoll): string {
-    const count = roll.max - roll.min + 1;
+    const shown = rouletteFaces(roll);
+    const count = shown.length;
     const slices = Array.from({ length: count }, (_, i) => {
         const angle = (i / count) * Math.PI * 2 - Math.PI / 2, half = Math.PI / count;
         const a = { x: 100 + 90 * Math.cos(angle - half), y: 100 + 90 * Math.sin(angle - half) }, b = { x: 100 + 90 * Math.cos(angle + half), y: 100 + 90 * Math.sin(angle + half) };
-        return `<path d="M100 100 L${a.x} ${a.y} A90 90 0 0 1 ${b.x} ${b.y}Z" fill="${i % 2 ? '#24443f' : '#c4ac77'}" stroke="#e0cca0" stroke-width=".4"/><text x="${100 + 74 * Math.cos(angle)}" y="${104 + 74 * Math.sin(angle)}" text-anchor="middle" fill="${i % 2 ? '#e9d9ad' : '#1c3030'}" font-size="10" font-weight="700">${roll.min + i}</text>`;
+        return `<path d="M100 100 L${a.x} ${a.y} A90 90 0 0 1 ${b.x} ${b.y}Z" fill="${i % 2 ? '#24443f' : '#c4ac77'}" stroke="#e0cca0" stroke-width=".4"/><text x="${100 + 74 * Math.cos(angle)}" y="${104 + 74 * Math.sin(angle)}" text-anchor="middle" fill="${i % 2 ? '#e9d9ad' : '#1c3030'}" font-size="10" font-weight="700">${shown[i]}</text>`;
     }).join('');
-    return `<div class="roulette-stage" aria-label="공격력 강화 룰렛"><span class="roulette-pointer"></span><svg class="roulette-wheel" viewBox="0 0 200 200">${slices}<circle cx="100" cy="100" r="44" fill="#142830" stroke="#d9c18e" stroke-width="2"/></svg><span class="roulette-center">ATTACK<br><b>+1~20%</b></span></div><div class="dice-result" role="status" aria-live="polite"><small>강화 룰렛 회전 중</small><strong>빠르게 운명을 확인하세요</strong></div>`;
+    return `<div class="roulette-stage" aria-label="${roll.label} 강화 룰렛"><span class="roulette-pointer"></span><svg class="roulette-wheel" viewBox="0 0 200 200">${slices}<circle cx="100" cy="100" r="44" fill="#142830" stroke="#d9c18e" stroke-width="2"/></svg><span class="roulette-center">${roll.stat === 'haste' ? 'SPEED' : 'ATTACK'}<br><b>+${roll.min}~${roll.max}%</b></span></div><div class="dice-result" role="status" aria-live="polite"><small>강화 룰렛 회전 중</small><strong>빠르게 운명을 확인하세요</strong></div>`;
 }
 export function diceMarkup(roll: UpgradeRoll): string {
-    if (roll.kind === 'tower' && roll.stat === 'attack')
+    if (roll.kind === 'tower')
         return rouletteMarkup(roll) + `<p class="dice-footnote">정규분포형 가중 룰렛 · 중간값이 더 자주 나옵니다</p>`;
     const distribution = normalDiceDistribution(roll.min, roll.max);
     const peak = Math.max(...distribution.map(d => d.probability));
@@ -25,7 +32,9 @@ export function animateDice(container: HTMLElement, roll: UpgradeRoll, onReady: 
     const die = container.querySelector<HTMLElement>('.d20-die')!;
     const result = container.querySelector<HTMLElement>('.dice-result')!;
     const wheel = container.querySelector<SVGElement>('.roulette-wheel');
-    const endAngle = 1440 - (roll.value - roll.min) * 360 / (roll.max - roll.min + 1);
+    const faces = rouletteFaces(roll);
+    const index = faces.indexOf(roll.value);
+    const endAngle = 1440 - index * 360 / faces.length;
     function tick(now: number) {
         if (!container.isConnected)
             return;

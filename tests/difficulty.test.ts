@@ -57,7 +57,7 @@ test.each([1, 5, 10, 120])('difficulty scales actual spawned enemies for wave %s
     return sim.enemies;
   });
   const normal = snapshots[0]!;
-  for (const [index, multiplier] of [1, 1.5, 2.5, 4].entries()) {
+  for (const [index, multiplier] of [1, 1.5, 2, 3].entries()) {
     const enemies = snapshots[index]!;
     expect(enemies).toHaveLength(normal.length * (index === 3 ? 2 : 1));
     expect(enemies[0]!.maxHp).toBe(Math.round(normal[0]!.maxHp * multiplier));

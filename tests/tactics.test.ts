@@ -26,20 +26,20 @@ describe('expedition tactics', () => {
     });
     test('wave reward stops time until one irreversible choice is made', () => {
         const sim = game();
-        sim.state.wave = 4;
+        sim.state.wave = 9;
         sim.state.baseHealth = 100; sim.state.maxBaseHealth = 100;
         sim.startNextWave();
-        sim.update(sim.waves[4]!.durationMs);
+        sim.update(sim.waves[9]!.durationMs);
         expect(sim.pendingReward).toBe(true);
         sim.update(100000);
-        expect(sim.state.wave).toBe(5);
+        expect(sim.state.wave).toBe(10);
         const reward = sim.rewardChoices[0]!;
         const roll = sim.rollReward(reward.id)!;
         expect(sim.resolveUpgradeRoll()).toBe(true);
         expect(sim.getUpgradeValue(reward.stat)).toBe(roll.value);
         expect(sim.rollReward(reward.id)).toBeNull();
         sim.update(5000);
-        expect(sim.state.wave).toBe(6);
+        expect(sim.state.wave).toBe(11);
     });
     test('ended runs cannot summon and restart clears expedition bonuses', () => {
         const sim = game();

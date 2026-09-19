@@ -98,12 +98,12 @@ describe("lotto defence game systems", () => {
     }
   });
 
-  test("immortal units cannot be merged beyond the final rarity", () => {
+  test("immortal units fuse into uniques", () => {
     const rng = createSeededRng(7);
     const source = UNIT_DEFINITIONS.find((unit) => unit.rarity === "immortal" && unit.role === "single");
 
     expect(source).toBeDefined();
-    expect(() => createMergeCandidates(source!.id, rng)).toThrow(/cannot be merged/i);
+    expect(createMergeCandidates(source!.id, rng).every(u => u.uniqueAbility)).toBe(true);
   });
 
   test("bulk merge automatically resolves every available three-of-a-kind group", () => {
@@ -149,8 +149,8 @@ describe("lotto defence game systems", () => {
       ],
     };
 
-    expect([...simulation.getMergeableSlots()].sort((a, b) => a - b)).toEqual([0, 1, 2]);
-    expect(simulation.getMergeableGroups()).toEqual([[0, 1, 2]]);
+    expect([...simulation.getMergeableSlots()].sort((a, b) => a - b)).toEqual([0, 1, 2, 3, 4, 5]);
+    expect(simulation.getMergeableGroups()).toEqual([[0, 1, 2], [3, 4, 5]]);
   });
 
   test("waves contain 120 rounds with bosses every fifth wave and true bosses every tenth", () => {
@@ -193,13 +193,13 @@ describe("lotto defence game systems", () => {
     });
   });
 
-  test("the expanded skill tree has thirteen tracks with seven meaningful tiers", () => {
-    expect(skillTracks).toHaveLength(13);
-    expect(skillTree).toHaveLength(91);
+  test("the expanded skill tree has twelve tracks with twenty meaningful tiers", () => {
+    expect(skillTracks).toHaveLength(12);
+    expect(skillTree).toHaveLength(240);
     for (const track of skillTracks) {
       const nodes = skillTree.filter((node) => node.branch === track.id);
-      expect(nodes).toHaveLength(7);
-      expect(nodes.map((node) => node.tier)).toEqual([1, 2, 3, 4, 5, 6, 7]);
+      expect(nodes).toHaveLength(20);
+      expect(nodes.map((node) => node.tier)).toEqual(Array.from({length:20}, (_,i)=>i+1));
     }
 
     const progressedMeta = {
@@ -210,30 +210,30 @@ describe("lotto defence game systems", () => {
       ],
     };
     const initialState = createInitialRunState(progressedMeta);
-    expect(initialState.freeSummons).toBe(14);
-    expect(initialState.baseHealth).toBe(62);
-    expect(initialState.maxBaseHealth).toBe(62);
+    expect(initialState.freeSummons).toBe(3.5);
+    expect(initialState.baseHealth).toBe(30.5);
+    expect(initialState.maxBaseHealth).toBe(30.5);
   });
 
-  test("all seven skill tiers combine into their documented maximum effects", () => {
+  test("all twenty skill tiers combine into their documented maximum effects", () => {
     const meta = {
       ...createDefaultMetaProgress(),
       unlockedSkills: skillTree.map((node) => node.id),
     };
 
-    expect(getSkillEffectTotal(meta, "attackBonus")).toBeCloseTo(0.5);
-    expect(getSkillEffectTotal(meta, "attackSpeedBonus")).toBeCloseTo(0.43);
-    expect(getSkillEffectTotal(meta, "criticalChanceBonus")).toBeCloseTo(0.115);
-    expect(getSkillEffectTotal(meta, "startGold")).toBe(200);
+    expect(getSkillEffectTotal(meta, "attackBonus")).toBeCloseTo(0.4825);
+    expect(getSkillEffectTotal(meta, "attackSpeedBonus")).toBeCloseTo(0.4325);
+    expect(getSkillEffectTotal(meta, "criticalChanceBonus")).toBeCloseTo(0.11);
+    expect(getSkillEffectTotal(meta, "startGold")).toBe(245);
     expect(getSkillEffectTotal(meta, "goldBonus")).toBeCloseTo(0.52);
-    expect(getSkillEffectTotal(meta, "summonDiscount")).toBeCloseTo(0.18);
-    expect(getSkillEffectTotal(meta, "startFreeSummons")).toBe(14);
-    expect(getSkillEffectTotal(meta, "jackpotChance")).toBeCloseTo(0.045);
-    expect(getSkillEffectTotal(meta, "uniqueSummonBonus")).toBeCloseTo(0.98);
-    expect(getSkillEffectTotal(meta, "baseHealthBonus")).toBe(42);
-    expect(getSkillEffectTotal(meta, "uniqueExperienceBonus")).toBeCloseTo(0.98);
-    expect(getSkillEffectTotal(meta, "uniqueAttackBonus")).toBeCloseTo(0.5);
-    expect(getSkillEffectTotal(meta, "uniqueSkillPowerBonus")).toBeCloseTo(0.64);
+    expect(getSkillEffectTotal(meta, "summonDiscount")).toBeCloseTo(0.175);
+    expect(getSkillEffectTotal(meta, "startFreeSummons")).toBe(16.5);
+    expect(getSkillEffectTotal(meta, "jackpotChance")).toBeCloseTo(0.047);
+    expect(getSkillEffectTotal(meta, "uniqueSummonBonus")).toBe(0);
+    expect(getSkillEffectTotal(meta, "baseHealthBonus")).toBe(49.5);
+    expect(getSkillEffectTotal(meta, "uniqueExperienceBonus")).toBeCloseTo(1.22);
+    expect(getSkillEffectTotal(meta, "uniqueAttackBonus")).toBeCloseTo(0.58);
+    expect(getSkillEffectTotal(meta, "uniqueSkillPowerBonus")).toBeCloseTo(0.745);
   });
 
   test("skill purchases require prerequisites and persist unlocked nodes", () => {
@@ -308,25 +308,11 @@ describe("lotto defence game systems", () => {
     expect(pickRarity(rng, "normal")).toBe("legendary");
   });
 
-  test("advanced unique summon chance is five times higher at 6.85 percent", () => {
-    expect(ADVANCED_UNIQUE_BASE_CHANCE).toBeCloseTo(0.0685);
-    expect(rollAdvancedUniqueUnit({ next: () => 0.001 })?.id).toBe("mythic-ranger");
-    expect(rollAdvancedUniqueUnit({ next: () => 0.03 })?.id).toBe("mythic-plague-warlock");
-    expect(rollAdvancedUniqueUnit({ next: () => 0.052 })?.id).toBe("transcendent-time-mage");
-    expect(rollAdvancedUniqueUnit({ next: () => 0.06 })?.id).toBe("transcendent-frost-witch");
-    expect(rollAdvancedUniqueUnit({ next: () => 0.067 })?.id).toBe("immortal-berserker");
-    expect(rollAdvancedUniqueUnit({ next: () => 0.0685 })).toBeNull();
-    expect(rollAdvancedUniqueUnit({ next: () => 0.13 }, 0.98)).not.toBeNull();
-    expect(rollAdvancedUniqueUnit({ next: () => 0.13563 }, 0.98)).toBeNull();
-
-    const rng = createSeededRng(77);
-    let uniqueCount = 0;
-    for (let index = 0; index < 100_000; index += 1) {
-      if (rollAdvancedUniqueUnit(rng)) {
-        uniqueCount += 1;
-      }
+  test("advanced summons cannot produce uniques, including legacy bonuses", () => {
+    expect(ADVANCED_UNIQUE_BASE_CHANCE).toBe(0);
+    for (const value of [0, .001, .03, .052, .067, .99]) {
+      expect(rollAdvancedUniqueUnit({next: () => value}, 100)).toBeNull();
     }
-    expect(uniqueCount / 100_000).toBeCloseTo(0.0685, 2);
   });
 
   test("advanced summon costs five times more and can roll mythic units", () => {
@@ -439,28 +425,28 @@ describe("lotto defence game systems", () => {
     expect(getUniqueUnitLevel(second, ranger.id)).toBe(2);
 
     const levelOneStats = getEffectiveUnitStats(ranger, 1);
-    const highLevelStats = getEffectiveUnitStats(ranger, 99);
+    const highLevelStats = getEffectiveUnitStats(ranger, 999);
     expect(highLevelStats.attack).toBeGreaterThan(levelOneStats.attack * 3);
     expect(highLevelStats.attackSpeed).toBeLessThan(levelOneStats.attackSpeed);
     expect(highLevelStats.range).toBeGreaterThan(levelOneStats.range);
 
     const earlyGain = getUniqueAttackMultiplier(20) - getUniqueAttackMultiplier(1);
-    const lateGain = getUniqueAttackMultiplier(99) - getUniqueAttackMultiplier(80);
+    const lateGain = getUniqueAttackMultiplier(999) - getUniqueAttackMultiplier(80);
     const earlySpeedGain = getUniqueAttackSpeedMultiplier(20) - getUniqueAttackSpeedMultiplier(1);
-    const lateSpeedGain = getUniqueAttackSpeedMultiplier(99) - getUniqueAttackSpeedMultiplier(80);
+    const lateSpeedGain = getUniqueAttackSpeedMultiplier(999) - getUniqueAttackSpeedMultiplier(80);
     const earlyRangeGain = getUniqueRangeBonus(20) - getUniqueRangeBonus(1);
-    const lateRangeGain = getUniqueRangeBonus(99) - getUniqueRangeBonus(80);
+    const lateRangeGain = getUniqueRangeBonus(999) - getUniqueRangeBonus(80);
     const earlyCriticalGain = getUniqueCriticalChanceBonus(20) - getUniqueCriticalChanceBonus(1);
-    const lateCriticalGain = getUniqueCriticalChanceBonus(99) - getUniqueCriticalChanceBonus(80);
+    const lateCriticalGain = getUniqueCriticalChanceBonus(999) - getUniqueCriticalChanceBonus(80);
 
-    expect(getUniqueAttackMultiplier(50)).toBeCloseTo(1.8295);
-    expect(getUniqueAttackMultiplier(99)).toBeCloseTo(3.534);
-    expect(getUniqueAttackSpeedMultiplier(50)).toBeCloseTo(1.396);
-    expect(getUniqueAttackSpeedMultiplier(99)).toBeCloseTo(2.192);
-    expect(getUniqueRangeBonus(50)).toBe(16);
-    expect(getUniqueRangeBonus(99)).toBe(50);
-    expect(getUniqueCriticalChanceBonus(50)).toBeCloseTo(0.075);
-    expect(getUniqueCriticalChanceBonus(99)).toBeCloseTo(0.25);
+    expect(getUniqueAttackMultiplier(50)).toBeCloseTo(1.3962);
+    expect(getUniqueAttackMultiplier(999)).toBeCloseTo(10.734);
+    expect(getUniqueAttackSpeedMultiplier(50)).toBeCloseTo(1.1979);
+    expect(getUniqueAttackSpeedMultiplier(999)).toBeCloseTo(5.792);
+    expect(getUniqueRangeBonus(50)).toBe(1);
+    expect(getUniqueRangeBonus(999)).toBe(50);
+    expect(getUniqueCriticalChanceBonus(50)).toBeCloseTo(0.003);
+    expect(getUniqueCriticalChanceBonus(999)).toBeCloseTo(0.25);
     expect(lateGain).toBeGreaterThan(earlyGain);
     expect(lateSpeedGain).toBeGreaterThan(earlySpeedGain);
     expect(lateRangeGain).toBeGreaterThan(earlyRangeGain);
@@ -468,7 +454,7 @@ describe("lotto defence game systems", () => {
 
     for (const uniqueUnit of UNIT_DEFINITIONS.filter((unit) => unit.uniqueAbility)) {
       const levelOne = getEffectiveUnitStats(uniqueUnit, 1);
-      const levelNinetyNine = getEffectiveUnitStats(uniqueUnit, 99);
+      const levelNinetyNine = getEffectiveUnitStats(uniqueUnit, 999);
       expect(levelNinetyNine.attack).toBeGreaterThan(levelOne.attack * 3);
       expect(levelNinetyNine.attackSpeed).toBeLessThan(levelOne.attackSpeed * 0.5);
       expect(levelNinetyNine.range).toBe(levelOne.range + 50);
@@ -490,10 +476,10 @@ describe("lotto defence game systems", () => {
 
     const maxedMeta = {
       ...leveled.meta,
-      uniqueUnitLevels: { ...leveled.meta.uniqueUnitLevels, [ranger.id]: 99 },
+      uniqueUnitLevels: { ...leveled.meta.uniqueUnitLevels, [ranger.id]: 999 },
     };
     const maxed = grantUniqueUnitExperience(maxedMeta, ranger.id, 10_000);
-    expect(maxed.level).toBe(99);
+    expect(maxed.level).toBe(999);
     expect(maxed.experience).toBe(0);
   });
 
@@ -770,8 +756,9 @@ describe("lotto defence game systems", () => {
     expect(simulation.enemies[0]!.maxHp).toBeGreaterThan(3_000);
   });
 
-  test("late true bosses keep increasing in health and armor through wave 60", () => {
-    const stats = [40, 50, 60].map((wave) => {
+  test("the same true boss keeps increasing in health and armor across cycles", () => {
+    // Different boss species have different base stats; compare the same species.
+    const stats = [40, 80, 120].map((wave) => {
       const simulation = new GameSimulation(createDefaultMetaProgress(), createSeededRng(wave));
       simulation.state = { ...simulation.state, wave: wave - 1 };
       simulation.startNextWave();

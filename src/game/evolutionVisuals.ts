@@ -4,7 +4,7 @@ import type { UnitDefinition } from './types';
 
 export function getEvolutionVisual(unit: UnitDefinition, level = 1, boardCount = 1) {
     const stage = getRarityIndex(unit.rarity) + 1;
-    const skillStage = isUniqueUnit(unit) ? 1 + Math.floor(Math.min(99, Math.max(1, level)) / 5) : 0;
+    const skillStage = isUniqueUnit(unit) ? 1 + Math.floor(Math.min(999, Math.max(1, level)) / 5) : 0;
     const crowdScale = boardCount > 60 ? .72 : boardCount > 30 ? .85 : 1;
     return {
         stage,

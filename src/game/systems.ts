@@ -2,7 +2,7 @@ import { RARITIES, getRarityIndex } from "./rarities";
 import { createSeededRng, type Rng } from "./rng";
 import { createDefaultMetaProgress, getSkillEffectTotal } from "./skills";
 import type { JackpotReward, KillGoldReward, MetaProgress, RarityId, RunState, UnitDefinition } from "./types";
-import { getUnitDefinition, getUnitsByRarity } from "./units";
+import { getUnitDefinition, getUnitsByRarity, UNIT_DEFINITIONS, isUniqueUnit } from "./units";
 
 export { RARITIES, getRarity, getRarityIndex } from "./rarities";
 export { createRandomRng, createSeededRng } from "./rng";
@@ -33,15 +33,7 @@ const ADVANCED_SUMMON_CHANCES: Partial<Record<RarityId, number>> = {
   immortal: 0.002,
 };
 
-const ADVANCED_UNIQUE_SUMMON_ENTRIES = [
-  { unitId: "mythic-ranger", chance: 0.025 },
-  { unitId: "mythic-plague-warlock", chance: 0.025 },
-  { unitId: "transcendent-time-mage", chance: 0.008 },
-  { unitId: "transcendent-frost-witch", chance: 0.008 },
-  { unitId: "immortal-berserker", chance: 0.0025 },
-] as const;
-
-export const ADVANCED_UNIQUE_BASE_CHANCE = ADVANCED_UNIQUE_SUMMON_ENTRIES.reduce((total, entry) => total + entry.chance, 0);
+export const ADVANCED_UNIQUE_BASE_CHANCE = 0;
 
 export function createInitialRunState(meta: MetaProgress = createDefaultMetaProgress()): RunState {
   const maxBaseHealth = 20 + getSkillEffectTotal(meta, "baseHealthBonus");
@@ -83,17 +75,7 @@ export function pickRarity(rng: Pick<Rng, "next">, kind: SummonKind = "normal"):
   return kind === "advanced" ? RARITIES[RARITIES.length - 1]!.id : "legendary";
 }
 
-export function rollAdvancedUniqueUnit(rng: Pick<Rng, "next">, chanceBonus = 0): UnitDefinition | null {
-  const multiplier = 1 + Math.max(0, chanceBonus);
-  const roll = rng.next();
-  let cumulative = 0;
-
-  for (const entry of ADVANCED_UNIQUE_SUMMON_ENTRIES) {
-    cumulative += entry.chance * multiplier;
-    if (roll < cumulative) {
-      return getUnitDefinition(entry.unitId);
-    }
-  }
+export function rollAdvancedUniqueUnit(_rng: Pick<Rng, "next">, _chanceBonus = 0): UnitDefinition | null {
   return null;
 }
 
@@ -108,11 +90,8 @@ export function createMergeCandidates(sourceUnitId: string, rng: Rng): UnitDefin
   const sourceIndex = getRarityIndex(source.rarity);
   const nextRarity = RARITIES[sourceIndex + 1];
 
-  if (!nextRarity) {
-    throw new Error("Immortal units cannot be merged into a higher rarity.");
-  }
-
-  const candidates = [...getUnitsByRarity(nextRarity.id)];
+  if (isUniqueUnit(source)) throw new Error("유니크는 일반 합성할 수 없습니다.");
+  const candidates = nextRarity ? getUnitsByRarity(nextRarity.id).filter(u => !isUniqueUnit(u)) : UNIT_DEFINITIONS.filter(u => u.uniqueAbility && !u.superUnique);
   for (let index = candidates.length - 1; index > 0; index -= 1) {
     const swapIndex = Math.floor(rng.next() * (index + 1));
     [candidates[index], candidates[swapIndex]] = [candidates[swapIndex]!, candidates[index]!];
@@ -145,14 +124,14 @@ export function resolveJackpotReward(state: RunState, reward: JackpotReward): Ru
 export function rollJackpotReward(rng: Rng): JackpotReward {
   const roll = rng.next();
   if (roll < 0.45) {
-    return { type: "gold", amount: 35 };
+    return { type: "gold", amount: 8.75 };
   }
   if (roll < 0.75) {
-    return { type: "freeSummon", amount: 1 };
+    return { type: "freeSummon", amount: 0.25 };
   }
   return rng.next() < 0.5
-    ? { type: "buff", stat: "attack", multiplier: 1.35, durationMs: 10_000 }
-    : { type: "buff", stat: "attackSpeed", multiplier: 1.3, durationMs: 10_000 };
+    ? { type: "buff", stat: "attack", multiplier: 1.0875, durationMs: 10_000 }
+    : { type: "buff", stat: "attackSpeed", multiplier: 1.075, durationMs: 10_000 };
 }
 
 export function rollKillGoldReward(baseGold: number, rng: Pick<Rng, "next">): KillGoldReward {

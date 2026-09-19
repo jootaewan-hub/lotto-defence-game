@@ -2268,3 +2268,14 @@ dialog h2 {
 #selected-unit .ultimate-skill-list { max-height:145px; overflow:auto; }
 #selected-unit .ultimate-skill-list p { font-size:10px; line-height:1.5; margin:6px 0; }
 @media(max-width:600px){ .ultimate-heading .unit-art{width:90px;height:90px}.ultimate-forge{padding:14px}.ultimate-heading h3{font-size:25px} }
+
+.boss-hud {width:min(360px,calc(100% - 20px));margin:0 auto;padding:5px 0;pointer-events:none;display:grid;gap:3px;}
+.boss-hud[hidden] {display:none;}
+.boss-health {padding:3px 8px;background:#171b25ed;border:1px solid #db8d7270;border-radius:4px;color:#fff0d5;}
+.boss-health>div {display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:10px;line-height:13px;}
+.boss-health b {min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500;}
+.boss-health span {flex-shrink:0;font-variant-numeric:tabular-nums;}
+.boss-health progress {display:block;width:100%;height:5px;margin-top:2px;accent-color:#ed6c67;}
+#auto-progress[aria-pressed="true"] {color:#b8f1ce;border-color:#69b88a;}
+#merge-rarity {background:#142830;color:#ebd49e;border:1px solid #68766b;border-radius:6px;padding:6px;}
+.battle-toolbar,.roster-tools {flex-wrap:wrap;gap:6px;}
