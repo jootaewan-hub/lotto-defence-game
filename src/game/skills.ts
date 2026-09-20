@@ -51,7 +51,7 @@ export const skillTracks: SkillTrack[] = [
     label: "소환 비용",
     stat: "summonDiscount",
     values: [0.02, 0.02, 0.02, 0.025, 0.025, 0.03, 0.04],
-    describe: (value) => `일반·고급 소환 비용 -${(value * 100).toFixed(1)}%`,
+    describe: (value) => `모든 소환 비용 -${(value * 100).toFixed(1)}%`,
   },
   {
     id: "freeSummon",
