@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest';
 import { chooseAutoSummon, createMergeCandidates, createSeededRng, createDefaultMetaProgress, getRarityIndex, skillTracks } from '../src/game/systems';
 import { getUnitDefinition } from '../src/game/units';
+import { SUPER_COST, SUPER_INGREDIENT_COUNT } from '../src/game/superUnits';
 import { UNIQUE_UNIT_MAX_LEVEL } from '../src/game/units';
 import { REWARD_POOL } from '../src/game/upgrades';
 import { GameSimulation } from '../src/game/simulation';
@@ -105,6 +106,43 @@ test('the four automations are independent', () => {
   runAuto(sim, 3000);
   expect(sim.state.board.length).toBeGreaterThan(before);
   expect(sim.towerAttackUpgradePercent + sim.towerSpeedUpgradePercent).toBe(0);
+});
+test('auto craft banks the fee instead of spending it on summons', () => {
+  const sim = new GameSimulation(createDefaultMetaProgress(), createSeededRng(4));
+  sim.state.baseHealth = sim.state.maxBaseHealth = 1e9;
+  const role = 'single';
+  // every material for a warrior awakening, but not the fee
+  sim.state.board = [
+    'immortal-berserker',
+    ...Array(SUPER_INGREDIENT_COUNT).fill(`legendary-${role}`),
+    ...Array(SUPER_INGREDIENT_COUNT).fill(`mythic-${role}`),
+    ...Array(SUPER_INGREDIENT_COUNT).fill(`transcendent-${role}`),
+    ...Array(SUPER_INGREDIENT_COUNT).fill(`immortal-${role}`),
+  ].map((definitionId, i) => ({ instanceId: `u${i}`, definitionId, x: 120 + i * 6, y: 148, cooldownMs: 1e9 })) as any;
+  sim.state.gold = 1000;
+  sim.autoSummon = true;
+  sim.autoCraft = true;
+
+  for (let t = 0; t < 4000; t += 100) sim.update(100);
+
+  // with the materials stocked it saves rather than summoning them away
+  expect(sim.state.gold).toBe(1000);
+  expect(sim.state.board).toHaveLength(1 + 4 * SUPER_INGREDIENT_COUNT);
+
+  // once the fee is there it awakens on its own
+  sim.state.gold = SUPER_COST;
+  for (let t = 0; t < 2000; t += 100) sim.update(100);
+  expect(sim.state.board.some(u => u.definitionId === 'super-warrior')).toBe(true);
+  expect(sim.state.gold).toBe(0);
+});
+
+test('auto craft off keeps the old spend-it-all behaviour', () => {
+  const sim = new GameSimulation(createDefaultMetaProgress(), createSeededRng(4));
+  sim.state.baseHealth = sim.state.maxBaseHealth = 1e9;
+  sim.state.gold = 1000;
+  sim.autoSummon = true;
+  for (let t = 0; t < 4000; t += 100) sim.update(100);
+  expect(sim.state.gold).toBeLessThan(1000);
 });
 test('auto summon builds and merges an army on its own', () => {
   const sim = new GameSimulation(createDefaultMetaProgress(), createSeededRng(9));

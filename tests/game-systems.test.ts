@@ -411,7 +411,7 @@ describe("lotto defence game systems", () => {
     // the premium over a guardian summon, cut by a third from the original 5x
     const advancedCost = simulation.advancedSummonCost;
     expect(advancedCost).toBe(Math.round(simulation.summonCost * (1 + 4 * (2 / 3))));
-    expect(simulation.legendarySummonCost).toBe(advancedCost * 3);
+    expect(simulation.legendarySummonCost).toBe(advancedCost * 2);
     expect(simulation.summonAdvanced()).toBe(true);
     expect(simulation.state.gold).toBe(100 - advancedCost);
 

@@ -37,12 +37,12 @@ const ADVANCED_SUMMON_CHANCES: Partial<Record<RarityId, number>> = {
  * values times (1 - LEGENDARY_UNIQUE_CHANCE).
  */
 const LEGENDARY_SUMMON_CHANCES: Partial<Record<RarityId, number>> = {
-  epic: 0.382,
-  hero: 0.271,
-  legendary: 0.191,
-  mythic: 0.106,
-  transcendent: 0.038,
-  immortal: 0.012,
+  epic: 0.2,
+  hero: 0.27,
+  legendary: 0.25,
+  mythic: 0.16,
+  transcendent: 0.085,
+  immortal: 0.03,
 };
 
 const SUMMON_CHANCES: Record<SummonKind, Partial<Record<RarityId, number>>> = {

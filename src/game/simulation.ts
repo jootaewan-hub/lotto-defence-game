@@ -1,4 +1,4 @@
-import { MAX_TOWERS, MAX_ITEM_UPGRADE_LEVEL, SUPER_COST, DRAGON_ITEMS, getSuperRecipe, getItemUpgradeChance, getItemUpgradeCost } from './superUnits';
+import { MAX_TOWERS, MAX_ITEM_UPGRADE_LEVEL, SUPER_COST, SUPER_INGREDIENT_COUNT, SUPER_FEEDER_RARITIES, TOWER_TYPES, DRAGON_ITEMS, getSuperRecipe, getItemUpgradeChance, getItemUpgradeCost } from './superUnits';
 import { DIFFICULTIES } from './waves';
 import { ULTIMATE_ID, ULTIMATE_COST, getUltimateRecipe } from './ultimate';
 import { rollNormalInteger, sampleRewards, type ExpeditionUpgrades, type RewardDefinition, type UpgradeRoll, type UpgradeStat } from './upgrades';
@@ -38,6 +38,7 @@ import { getRarity, getRarityIndex } from "./rarities";
 import {
   getEffectiveUnitStats,
   getUniqueUnitLevel,
+  getTowerType,
   getUnitDefinition,
   getUnitsByRarity,
   isUniqueUnit,
@@ -100,8 +101,12 @@ const BASE_SUMMON_COST = 10;
  * kind, so the tier that climbs the ladder fastest per gold finished last.
  */
 const ADVANCED_SUMMON_COST_MULTIPLIER = 1 + (5 - 1) * (2 / 3);
-/** Three advanced summons, so the tiers stay in a readable ratio. */
-const LEGENDARY_SUMMON_COST_RATIO = 3;
+/**
+ * Two advanced summons. At three it could not be worth more per gold than an
+ * advanced summon without handing out immortals at a rate that would trivialise
+ * the ladder, so the premium comes down and the table comes up instead.
+ */
+const LEGENDARY_SUMMON_COST_RATIO = 2;
 
 /** Auto play acts on this cadence so it stays watchable and does not flood the log. */
 const AUTO_ACTION_INTERVAL_MS = 250;
@@ -149,6 +154,8 @@ export class GameSimulation {
   autoUpgrade = false;
   /** Keeping the guard sorted as it changes. */
   autoArrange = false;
+  /** Banking for, holding materials for, and performing awakenings. */
+  autoCraft = false;
   private autoActionCooldownMs = 0;
   /** Summoning and upgrading compete for the same gold, so they take turns. */
   private autoPreferUpgrade = false;
@@ -517,7 +524,7 @@ export class GameSimulation {
       return;
     }
 
-    if (this.autoSummon || this.autoUpgrade || this.autoArrange) this.tickAutoPlay(deltaMs);
+    if (this.autoSummon || this.autoUpgrade || this.autoArrange || this.autoCraft) this.tickAutoPlay(deltaMs);
 
     this.frostCooldownMs = Math.max(0, this.frostCooldownMs - deltaMs);
     if (this.tickNextWaveDelay(deltaMs)) {
@@ -547,12 +554,15 @@ export class GameSimulation {
 
     if (this.autoArrange) this.tickAutoArrange();
 
+    if (this.autoCraft && this.tickAutoCraft()) return;
+
     // Merging first and for free: it is what turns cheap summons into high tiers
     // and hands the board slots back, which is what keeps summoning affordable.
-    if (this.autoSummon && this.getMergeableGroups().length > 0) {
-      this.bulkMergeAll();
-      return;
-    }
+    if (this.autoSummon && this.mergeSomething()) return;
+
+    // An awakening within reach outranks anything gold could buy instead, and
+    // spending down to the summon price is exactly why it was never reached.
+    if (this.autoCraft && this.isSavingForCraft()) return;
 
     const summonReady = this.autoSummon && this.nextAutoSummon() !== null;
     const upgradeReady = this.autoUpgrade && this.cheapestUpgradeSlot() >= 0;
@@ -565,6 +575,61 @@ export class GameSimulation {
     }
     if (summonReady) this.tickAutoSummon();
     else if (upgradeReady) this.tickAutoUpgrade();
+  }
+
+  /**
+   * Merges one group, holding back the feeder grades an awakening needs. Without
+   * the reserve, auto play merges its own ingredients upward and the recipe is
+   * never complete at the same moment twice.
+   */
+  private mergeSomething(): boolean {
+    const groups = this.getMergeableGroups();
+    if (groups.length === 0) return false;
+    if (!this.autoCraft) {
+      this.bulkMergeAll();
+      return true;
+    }
+
+    const held = new Map<string, number>();
+    for (const unit of this.state.board) {
+      const definition = getUnitDefinition(unit.definitionId);
+      const key = `${definition.rarity}:${getTowerType(definition)}`;
+      held.set(key, (held.get(key) ?? 0) + 1);
+    }
+
+    for (const group of groups) {
+      const definition = getUnitDefinition(this.state.board[group[0]!]!.definitionId);
+      const key = `${definition.rarity}:${getTowerType(definition)}`;
+      const reserved = (SUPER_FEEDER_RARITIES as readonly string[]).includes(definition.rarity) ? SUPER_INGREDIENT_COUNT : 0;
+      if ((held.get(key) ?? 0) - group.length < reserved) continue;
+      const prompt = this.requestMerge(group[0]!);
+      if (prompt) {
+        this.chooseMergeCandidate(prompt.candidates[0]!.id);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /** Performs any awakening whose materials and gold are both in hand. */
+  private tickAutoCraft(): boolean {
+    for (const type of TOWER_TYPES) {
+      if (this.getSuperRecipe(type).ready && this.craftSuper(type)) return true;
+    }
+    return this.getUltimateRecipe().ready && this.craftUltimate();
+  }
+
+  /** True when an awakening has its materials and only the fee is missing. */
+  private isSavingForCraft(): boolean {
+    for (const type of TOWER_TYPES) {
+      const recipe = this.getSuperRecipe(type);
+      if (recipe.owned) continue;
+      const stocked = recipe.unique.length >= 1
+        && SUPER_FEEDER_RARITIES.every(rarity => recipe[rarity].length >= SUPER_INGREDIENT_COUNT);
+      if (stocked && this.state.gold < SUPER_COST) return true;
+    }
+    const ultimate = this.getUltimateRecipe();
+    return !ultimate.owned && ultimate.slots.every(slot => slot >= 0) && this.state.gold < ULTIMATE_COST;
   }
 
   /** The summon auto play would buy right now, or null when it cannot buy. */
