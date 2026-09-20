@@ -26,8 +26,12 @@ export interface UpgradeRoll {
     towerId?: string;
     cost?: number;
 }
+/** Blessing rolls are this fraction of their declared range. */
+const BLESSING_DIVISOR = 2;
 function reward(stat: UpgradeStat, title: string, label: string, description: string, min: number, max: number, unit: string, cap: number, category: RewardDefinition['category'], icon: string): RewardDefinition {
-    return { id: stat, stat, title, label, description, min: stat === 'attack' ? 0.2 : min / 4, max: max / 4, unit, cap, category, icon };
+    // Declared ranges are halved, not quartered: a blessing used to land at a
+    // quarter of the number written beside it, which made every pick feel thin.
+    return { id: stat, stat, title, label, description, min: stat === 'attack' ? 0.2 : min / BLESSING_DIVISOR, max: max / BLESSING_DIVISOR, unit, cap, category, icon };
 }
 export const REWARD_POOL: readonly RewardDefinition[] = [
     reward('attack', '달의 축복', '전체 공격력', '모든 수호자의 기본 공격을 강화합니다.', 1, 20, '%', 10000, '공격', 'swords'),

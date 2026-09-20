@@ -13,7 +13,7 @@ test('immortal fusion produces uniques; lower fusion never does', () => {
 test('growth and reward balance', () => {
   expect(UNIQUE_UNIT_MAX_LEVEL).toBe(999);
   expect(skillTracks.every(t => t.values.length === 20)).toBe(true);
-  expect(REWARD_POOL.find(r => r.id === 'attack')).toMatchObject({min: 0.2, max: 5});
+  expect(REWARD_POOL.find(r => r.id === 'attack')).toMatchObject({min: 0.2, max: 10});
 });
 test('upgrading supports fractional small gains', () => {
   const sim = new GameSimulation(createDefaultMetaProgress(), createSeededRng(1));
