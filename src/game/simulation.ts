@@ -6,6 +6,7 @@ import { TOWER_SPAWN, clampTowerPosition } from "./geometry";
 import {
   MAX_WAVES,
   buildWaves,
+  autoSummonTarget,
   chooseAutoSummon,
   getBossEncounter,
   getMergeRequirementFor,
@@ -95,16 +96,17 @@ export type SimulationEvent =
     };
 
 const BASE_SUMMON_COST = 10;
+const ADVANCED_SUMMON_COST_MULTIPLIER = 5;
 /**
- * The premium over a guardian summon, cut by a third. At the old 5x and 15x the
- * legendary summon could not be bought often enough to ever collect three of a
- * kind, so the tier that climbs the ladder fastest per gold finished last.
+ * A run's summon price climbs by one per ten summons. The higher tiers multiply
+ * that climb, so they were the ones priced out late; they now take a third less
+ * of it. Their opening price is untouched.
  */
-const ADVANCED_SUMMON_COST_MULTIPLIER = 1 + (5 - 1) * (2 / 3);
+const HIGH_TIER_PRESSURE_SHARE = 2 / 3;
 /**
  * Two advanced summons. At three it could not be worth more per gold than an
  * advanced summon without handing out immortals at a rate that would trivialise
- * the ladder, so the premium comes down and the table comes up instead.
+ * the ladder, so the premium sits at two and the table carries the difference.
  */
 const LEGENDARY_SUMMON_COST_RATIO = 2;
 
@@ -407,18 +409,27 @@ export class GameSimulation {
     return true;
   }
 
-  get summonCost(): number {
+  /**
+   * `pressureShare` is how much of the run's accumulated price climb this tier
+   * takes. The opening price is always the full multiple of the base.
+   */
+  private summonPriceOf(multiplier: number, pressureShare: number): number {
     const discount = Math.min(0.5, getSkillEffectTotal(this.meta, "summonDiscount") + this.bonus("summonDiscount"));
     const summonPressure = Math.floor(this.successfulSummons / SUMMONS_PER_COST_INCREASE);
-    return Math.max(1, Math.round((BASE_SUMMON_COST + summonPressure) * (1 - discount)));
+    const price = (BASE_SUMMON_COST + summonPressure * pressureShare) * multiplier;
+    return Math.max(1, Math.round(price * (1 - discount)));
+  }
+
+  get summonCost(): number {
+    return this.summonPriceOf(1, 1);
   }
 
   get legendarySummonCost(): number {
-    return this.advancedSummonCost * LEGENDARY_SUMMON_COST_RATIO;
+    return this.summonPriceOf(ADVANCED_SUMMON_COST_MULTIPLIER * LEGENDARY_SUMMON_COST_RATIO, HIGH_TIER_PRESSURE_SHARE);
   }
 
   get advancedSummonCost(): number {
-    return Math.round(this.summonCost * ADVANCED_SUMMON_COST_MULTIPLIER);
+    return this.summonPriceOf(ADVANCED_SUMMON_COST_MULTIPLIER, HIGH_TIER_PRESSURE_SHARE);
   }
 
   get canStartWave(): boolean {
@@ -581,7 +592,26 @@ export class GameSimulation {
    * Merges one group, holding back the feeder grades an awakening needs. Without
    * the reserve, auto play merges its own ingredients upward and the recipe is
    * never complete at the same moment twice.
+   *
+   * A grade is held only once every grade above it is stocked, and only once the
+   * type owns the unique the recipe is really gated on. Climbing is what makes
+   * those higher grades in the first place, so a reserve sitting below an unmet
+   * grade starves the very recipe it was meant to protect.
    */
+  private reservedFeeders(): Set<string> {
+    const reserved = new Set<string>();
+    for (const type of TOWER_TYPES) {
+      const recipe = this.getSuperRecipe(type);
+      if (recipe.owned || recipe.unique.length < 1) continue;
+      for (let i = SUPER_FEEDER_RARITIES.length - 1; i >= 0; i -= 1) {
+        const rarity = SUPER_FEEDER_RARITIES[i]!;
+        if (recipe[rarity].length < SUPER_INGREDIENT_COUNT) break;
+        reserved.add(`${rarity}:${type}`);
+      }
+    }
+    return reserved;
+  }
+
   private mergeSomething(): boolean {
     const groups = this.getMergeableGroups();
     if (groups.length === 0) return false;
@@ -590,6 +620,7 @@ export class GameSimulation {
       return true;
     }
 
+    const reserved = this.reservedFeeders();
     const held = new Map<string, number>();
     for (const unit of this.state.board) {
       const definition = getUnitDefinition(unit.definitionId);
@@ -600,8 +631,8 @@ export class GameSimulation {
     for (const group of groups) {
       const definition = getUnitDefinition(this.state.board[group[0]!]!.definitionId);
       const key = `${definition.rarity}:${getTowerType(definition)}`;
-      const reserved = (SUPER_FEEDER_RARITIES as readonly string[]).includes(definition.rarity) ? SUPER_INGREDIENT_COUNT : 0;
-      if ((held.get(key) ?? 0) - group.length < reserved) continue;
+      const keep = reserved.has(key) ? SUPER_INGREDIENT_COUNT : 0;
+      if ((held.get(key) ?? 0) - group.length < keep) continue;
       const prompt = this.requestMerge(group[0]!);
       if (prompt) {
         this.chooseMergeCandidate(prompt.candidates[0]!.id);
@@ -632,11 +663,25 @@ export class GameSimulation {
     return !ultimate.owned && ultimate.slots.every(slot => slot >= 0) && this.state.gold < ULTIMATE_COST;
   }
 
+  /**
+   * Gold auto play is holding for its next summon. Upgrades spend only what
+   * sits above it, or the alternation hands every coin to the roulette and the
+   * summon it is saving for never happens.
+   */
+  private summonReserve(): number {
+    if (!this.autoSummon || this.state.freeSummons >= 1) return 0;
+    if (this.state.board.length >= MAX_TOWERS) return 0;
+    const target = autoSummonTarget(this.state.board.length);
+    if (target === "legendary") return this.legendarySummonCost;
+    if (target === "advanced") return this.advancedSummonCost;
+    return this.summonCost;
+  }
+
   /** The summon auto play would buy right now, or null when it cannot buy. */
   private nextAutoSummon(): SummonKind | null {
     if (this.state.board.length >= MAX_TOWERS) return null;
     if (this.state.freeSummons >= 1) return "normal";
-    return chooseAutoSummon(this.state.board.length / MAX_TOWERS, this.state.gold, {
+    return chooseAutoSummon(this.state.board.length, this.state.gold, {
       normal: this.summonCost,
       advanced: this.advancedSummonCost,
       legendary: this.legendarySummonCost,
@@ -662,7 +707,7 @@ export class GameSimulation {
       const cost = this.getTowerUpgradeCost(index);
       if (cost < best) { best = cost; slot = index; }
     });
-    return slot >= 0 && this.state.gold >= best ? slot : -1;
+    return slot >= 0 && this.state.gold - this.summonReserve() >= best ? slot : -1;
   }
 
   private tickAutoUpgrade(): void {

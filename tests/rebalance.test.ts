@@ -1,29 +1,27 @@
 import { expect, test } from 'vitest';
-import { chooseAutoSummon, createMergeCandidates, createSeededRng, createDefaultMetaProgress, getRarityIndex, skillTracks } from '../src/game/systems';
+import { AUTO_ADVANCED_TOWERS, AUTO_LEGENDARY_TOWERS, chooseAutoSummon, createMergeCandidates, createSeededRng, createDefaultMetaProgress, getRarityIndex, skillTracks } from '../src/game/systems';
 import { getUnitDefinition } from '../src/game/units';
 import { SUPER_COST, SUPER_INGREDIENT_COUNT } from '../src/game/superUnits';
+import { IMMORTAL_MERGE_COUNT } from '../src/game/systems';
 import { UNIQUE_UNIT_MAX_LEVEL } from '../src/game/units';
 import { REWARD_POOL } from '../src/game/upgrades';
 import { GameSimulation } from '../src/game/simulation';
 import { refundRetiredSkills } from '../src/game/skills';
 
-test('auto summon buys cheap while slots are free and dense as the board fills', () => {
+test('auto summon fills the board with bodies first, then buys quality', () => {
   const costs = { normal: 10, advanced: 50, legendary: 150 };
-  // plenty of slots: the guardian summon is the gold-efficient buy
+  // a thin guard needs bodies before it needs grades
   expect(chooseAutoSummon(0, 1000, costs)).toBe('normal');
-  expect(chooseAutoSummon(0.59, 1000, costs)).toBe('normal');
-  // slots tightening
-  expect(chooseAutoSummon(0.6, 1000, costs)).toBe('advanced');
-  expect(chooseAutoSummon(0.84, 1000, costs)).toBe('advanced');
-  // slots scarce: pay for density
-  expect(chooseAutoSummon(0.85, 1000, costs)).toBe('legendary');
-  expect(chooseAutoSummon(1, 1000, costs)).toBe('legendary');
-  // it never picks a tier it cannot pay for; it steps down to the best it can
-  expect(chooseAutoSummon(0.9, 100, costs)).toBe('advanced');
-  expect(chooseAutoSummon(0.9, 40, costs)).toBe('normal');
-  expect(chooseAutoSummon(0.7, 40, costs)).toBe('normal');
-  expect(chooseAutoSummon(0.9, 9, costs)).toBeNull();
-  expect(chooseAutoSummon(0, 0, costs)).toBeNull();
+  expect(chooseAutoSummon(AUTO_ADVANCED_TOWERS - 1, 1000, costs)).toBe('normal');
+  // standing guard: trade quantity for quality
+  expect(chooseAutoSummon(AUTO_ADVANCED_TOWERS, 1000, costs)).toBe('advanced');
+  expect(chooseAutoSummon(AUTO_LEGENDARY_TOWERS - 1, 1000, costs)).toBe('advanced');
+  expect(chooseAutoSummon(AUTO_LEGENDARY_TOWERS, 1000, costs)).toBe('legendary');
+  expect(chooseAutoSummon(200, 1000, costs)).toBe('legendary');
+  // short of its tier it saves rather than spending down on a cheaper one
+  expect(chooseAutoSummon(AUTO_LEGENDARY_TOWERS, 149, costs)).toBeNull();
+  expect(chooseAutoSummon(AUTO_ADVANCED_TOWERS, 49, costs)).toBeNull();
+  expect(chooseAutoSummon(0, 9, costs)).toBeNull();
 });
 const tower = (id: string, definitionId: string, extra: Record<string, unknown> = {}) =>
   ({ instanceId: id, definitionId, x: 120, y: 148, cooldownMs: 1e9, ...extra }) as any;
@@ -134,6 +132,32 @@ test('auto craft banks the fee instead of spending it on summons', () => {
   for (let t = 0; t < 2000; t += 100) sim.update(100);
   expect(sim.state.board.some(u => u.definitionId === 'super-warrior')).toBe(true);
   expect(sim.state.gold).toBe(0);
+});
+
+test('auto craft holds feeders back only once the unique is in hand', () => {
+  const stock = (ids: string[]) => ids.map((definitionId, i) => (
+    { instanceId: `u${i}`, definitionId, x: 120 + i * 6, y: 148, cooldownMs: 1e9 }
+  )) as any;
+  const climb = new GameSimulation(createDefaultMetaProgress(), createSeededRng(4));
+  climb.state.baseHealth = climb.state.maxBaseHealth = 1e9;
+  climb.state.gold = 0;
+  // no unique yet, so the pair is the recipe's only route to one
+  climb.state.board = stock(Array(IMMORTAL_MERGE_COUNT).fill('immortal-single'));
+  climb.autoSummon = true;
+  climb.autoCraft = true;
+  for (let t = 0; t < 2000; t += 100) climb.update(100);
+  expect(climb.state.board).toHaveLength(1);
+  expect(getUnitDefinition(climb.state.board[0]!.definitionId).rarity).toBe('unique');
+
+  // with the unique held, the next pair is the recipe's and stays put
+  const hold = new GameSimulation(createDefaultMetaProgress(), createSeededRng(4));
+  hold.state.baseHealth = hold.state.maxBaseHealth = 1e9;
+  hold.state.gold = 0;
+  hold.state.board = stock(['immortal-berserker', ...Array(IMMORTAL_MERGE_COUNT).fill('immortal-single')]);
+  hold.autoSummon = true;
+  hold.autoCraft = true;
+  for (let t = 0; t < 2000; t += 100) hold.update(100);
+  expect(hold.state.board).toHaveLength(1 + IMMORTAL_MERGE_COUNT);
 });
 
 test('auto craft off keeps the old spend-it-all behaviour', () => {

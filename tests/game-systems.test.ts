@@ -383,22 +383,36 @@ describe("lotto defence game systems", () => {
   });
 
   test("only the legendary summon can roll a unique, at the configured rate", () => {
-    expect(LEGENDARY_UNIQUE_CHANCE).toBe(0.005);
+    expect(LEGENDARY_UNIQUE_CHANCE).toBe(0.002);
     const pick = <T,>(items: readonly T[]): T => items[0]!;
 
-    for (const value of [0, .001, .0049]) {
+    for (const value of [0, .0005, .0019]) {
       const unit = rollSummonUniqueUnit({ next: () => value, pick });
       expect(unit).not.toBeNull();
       expect(unit!.uniqueAbility).toBeTruthy();
       expect(unit!.superUnique).toBeFalsy();
     }
 
-    for (const value of [.005, .03, .5, .99]) {
+    for (const value of [.002, .03, .5, .99]) {
       expect(rollSummonUniqueUnit({ next: () => value, pick })).toBeNull();
     }
   });
 
-  test("advanced summon carries the reduced premium and can roll mythic units", () => {
+  test("the run's price climb costs the higher tiers a third less", () => {
+    const simulation = new GameSimulation(createDefaultMetaProgress(), createSeededRng(1));
+    const opening = { normal: simulation.summonCost, advanced: simulation.advancedSummonCost, legendary: simulation.legendarySummonCost };
+    expect(opening).toEqual({ normal: 10, advanced: 50, legendary: 100 });
+
+    // a hundred summons in, the base has climbed by ten
+    (simulation as unknown as { successfulSummons: number }).successfulSummons = 100;
+    expect(simulation.summonCost).toBe(20);
+    // the higher tiers take two thirds of that climb, not all of it
+    expect(simulation.advancedSummonCost).toBe(Math.round((10 + 10 * (2 / 3)) * 5));
+    expect(simulation.legendarySummonCost).toBe(Math.round((10 + 10 * (2 / 3)) * 10));
+    expect(simulation.advancedSummonCost).toBeLessThan(simulation.summonCost * 5);
+  });
+
+  test("advanced summon opens at five times the base and legendary at twice that", () => {
     const rng = {
       next: () => 0.975,
       pick<T>(items: readonly T[]): T {
@@ -408,9 +422,9 @@ describe("lotto defence game systems", () => {
     const simulation = new GameSimulation(createDefaultMetaProgress(), rng);
     simulation.state = { ...simulation.state, gold: 100 };
 
-    // the premium over a guardian summon, cut by a third from the original 5x
+    // opening prices are plain multiples; only the later climb is discounted
     const advancedCost = simulation.advancedSummonCost;
-    expect(advancedCost).toBe(Math.round(simulation.summonCost * (1 + 4 * (2 / 3))));
+    expect(advancedCost).toBe(simulation.summonCost * 5);
     expect(simulation.legendarySummonCost).toBe(advancedCost * 2);
     expect(simulation.summonAdvanced()).toBe(true);
     expect(simulation.state.gold).toBe(100 - advancedCost);

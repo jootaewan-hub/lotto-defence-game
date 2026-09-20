@@ -37,12 +37,12 @@ const ADVANCED_SUMMON_CHANCES: Partial<Record<RarityId, number>> = {
  * values times (1 - LEGENDARY_UNIQUE_CHANCE).
  */
 const LEGENDARY_SUMMON_CHANCES: Partial<Record<RarityId, number>> = {
-  epic: 0.2,
-  hero: 0.27,
-  legendary: 0.25,
-  mythic: 0.16,
-  transcendent: 0.085,
-  immortal: 0.03,
+  epic: 0.17,
+  hero: 0.26,
+  legendary: 0.29,
+  mythic: 0.22,
+  transcendent: 0.045,
+  immortal: 0.013,
 };
 
 const SUMMON_CHANCES: Record<SummonKind, Partial<Record<RarityId, number>>> = {
@@ -59,27 +59,41 @@ const SUMMON_CEILING: Record<SummonKind, RarityId> = {
 };
 
 /**
- * Which summon auto play buys depends on what is scarce. Per gold a guardian
- * summon is worth about 3.1 advanced summons and 5.1 legendary ones; per board
- * slot a legendary is worth about 2.9 guardians. So it buys cheap while slots
- * are free and buys dense as the board fills.
+ * How many towers the guard wants standing before it trades quantity for
+ * quality. Per gold the higher tiers climb the ladder faster, so the only
+ * reason to buy cheap is that a thin board cannot hold the line at all.
+ *
+ * These used to be shares of MAX_TOWERS, a cap of 200 that a gold limited run
+ * never comes close to: auto play bought the cheapest summon and nothing else
+ * for an entire campaign, and the legendary table was never sampled once.
  */
-export const AUTO_ADVANCED_FILL_RATIO = 0.6;
-export const AUTO_LEGENDARY_FILL_RATIO = 0.85;
+export const AUTO_ADVANCED_TOWERS = 12;
+export const AUTO_LEGENDARY_TOWERS = 24;
 
-/** The summon auto play should buy, or null when nothing is affordable. */
+/** The tier auto play aims for at this board size, whatever it can afford. */
+export function autoSummonTarget(towers: number): SummonKind {
+  if (towers >= AUTO_LEGENDARY_TOWERS) return "legendary";
+  if (towers >= AUTO_ADVANCED_TOWERS) return "advanced";
+  return "normal";
+}
+
+/**
+ * The summon auto play should buy, or null when it is still short. It buys the
+ * one tier it is aiming for rather than whatever is affordable this instant:
+ * gold arrives in a trickle, so taking the cheapest summon the moment it can
+ * afford one means never holding enough for a better one.
+ */
 export function chooseAutoSummon(
-  fillRatio: number,
+  towers: number,
   gold: number,
   costs: Record<SummonKind, number>,
 ): SummonKind | null {
-  if (fillRatio >= AUTO_LEGENDARY_FILL_RATIO && gold >= costs.legendary) return "legendary";
-  if (fillRatio >= AUTO_ADVANCED_FILL_RATIO && gold >= costs.advanced) return "advanced";
-  return gold >= costs.normal ? "normal" : null;
+  const target = autoSummonTarget(towers);
+  return gold >= costs[target] ? target : null;
 }
 
 /** Only the legendary summon can produce a unique, and only this often. */
-export const LEGENDARY_UNIQUE_CHANCE = 0.005;
+export const LEGENDARY_UNIQUE_CHANCE = 0.002;
 
 export function createInitialRunState(meta: MetaProgress = createDefaultMetaProgress()): RunState {
   // Legacy skills count at a quarter of their value, which leaves stats that are
