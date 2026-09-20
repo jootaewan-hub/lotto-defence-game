@@ -338,6 +338,33 @@ h1 {
   gap: 17px;
   border-top: 1px solid #ffffff12
 }
+.auto-toggles {
+  display: flex;
+  align-items: center;
+  gap: 4px
+}
+.auto-label {
+  font-size: 9px;
+  opacity: .5;
+  margin-right: 2px
+}
+.auto-toggle {
+  padding: 5px 9px;
+  border: 1px solid #ffffff1f;
+  border-radius: 4px;
+  background: #ffffff08;
+  color: #9fb0ad;
+  font-size: 11px
+}
+.auto-toggle:hover:not(:disabled) {
+  border-color: #ffffff3d;
+  color: #d4e2df
+}
+.auto-toggle[aria-pressed="true"] {
+  border-color: #7fe3c0a8;
+  background: #7fe3c024;
+  color: #b8f4e0
+}
 .speed-controls {
   display: flex;
   align-items: center;

@@ -122,8 +122,18 @@ export class GameSimulation {
   state: RunState;
   meta: MetaProgress;
   pendingMerge: MergePrompt | null = null;
+  /** Waves and blessings. */
   autoProgress = false;
+  /** Summoning and the merging that pays for it. */
+  autoSummon = false;
+  /** The gold roulette. */
+  autoUpgrade = false;
+  /** Keeping the guard sorted as it changes. */
+  autoArrange = false;
   private autoActionCooldownMs = 0;
+  /** Summoning and upgrading compete for the same gold, so they take turns. */
+  private autoPreferUpgrade = false;
+  private lastArrangedBoardSize = -1;
   pendingReward = false;
   upgrades: ExpeditionUpgrades = {};
   rewardChoices: RewardDefinition[] = [];
@@ -488,7 +498,7 @@ export class GameSimulation {
       return;
     }
 
-    if (this.autoProgress) this.tickAutoPlay(deltaMs);
+    if (this.autoSummon || this.autoUpgrade || this.autoArrange) this.tickAutoPlay(deltaMs);
 
     this.frostCooldownMs = Math.max(0, this.frostCooldownMs - deltaMs);
     if (this.tickNextWaveDelay(deltaMs)) {
@@ -505,9 +515,9 @@ export class GameSimulation {
   }
 
   /**
-   * One action per cadence: merge if anything can merge, otherwise summon at the
-   * tier the board's fullness argues for. Affordability is checked before
-   * summoning so a broke run does not log a refusal every tick.
+   * One gold action per cadence. Arranging is free so it does not take the turn.
+   * Summoning and upgrading alternate when both are on, because they draw on the
+   * same gold and a strict order would leave the loser permanently broke.
    */
   private tickAutoPlay(deltaMs: number): void {
     this.autoActionCooldownMs -= deltaMs;
@@ -516,28 +526,73 @@ export class GameSimulation {
 
     if (this.pendingMerge || this.pendingReward || this.pendingRoll) return;
 
-    // Merging first: it is what turns cheap summons into high tiers and hands
-    // the board slots back, which is what keeps summoning affordable at all.
-    if (this.getMergeableGroups().length > 0) {
+    if (this.autoArrange) this.tickAutoArrange();
+
+    // Merging first and for free: it is what turns cheap summons into high tiers
+    // and hands the board slots back, which is what keeps summoning affordable.
+    if (this.autoSummon && this.getMergeableGroups().length > 0) {
       this.bulkMergeAll();
       return;
     }
 
-    if (this.state.board.length >= MAX_TOWERS) return;
+    const summonReady = this.autoSummon && this.nextAutoSummon() !== null;
+    const upgradeReady = this.autoUpgrade && this.cheapestUpgradeSlot() >= 0;
 
-    if (this.state.freeSummons >= 1) {
-      this.summonToFirstEmpty();
+    if (summonReady && upgradeReady) {
+      this.autoPreferUpgrade = !this.autoPreferUpgrade;
+      if (this.autoPreferUpgrade) this.tickAutoUpgrade();
+      else this.tickAutoSummon();
       return;
     }
+    if (summonReady) this.tickAutoSummon();
+    else if (upgradeReady) this.tickAutoUpgrade();
+  }
 
-    const choice = chooseAutoSummon(this.state.board.length / MAX_TOWERS, this.state.gold, {
+  /** The summon auto play would buy right now, or null when it cannot buy. */
+  private nextAutoSummon(): SummonKind | null {
+    if (this.state.board.length >= MAX_TOWERS) return null;
+    if (this.state.freeSummons >= 1) return "normal";
+    return chooseAutoSummon(this.state.board.length / MAX_TOWERS, this.state.gold, {
       normal: this.summonCost,
       advanced: this.advancedSummonCost,
       legendary: this.legendarySummonCost,
     });
+  }
+
+  private tickAutoSummon(): void {
+    const choice = this.nextAutoSummon();
     if (choice === "legendary") this.summonLegendary();
     else if (choice === "advanced") this.summonAdvanced();
     else if (choice === "normal") this.summonToFirstEmpty();
+  }
+
+  /**
+   * The roulette's gain is shared by the whole guard but its price rises only on
+   * the tower that pays, so the least-upgraded tower is always the cheapest way
+   * to buy the same bonus.
+   */
+  private cheapestUpgradeSlot(): number {
+    let slot = -1;
+    let best = Number.POSITIVE_INFINITY;
+    this.state.board.forEach((_, index) => {
+      const cost = this.getTowerUpgradeCost(index);
+      if (cost < best) { best = cost; slot = index; }
+    });
+    return slot >= 0 && this.state.gold >= best ? slot : -1;
+  }
+
+  private tickAutoUpgrade(): void {
+    const slot = this.cheapestUpgradeSlot();
+    if (slot < 0) return;
+    // keep the two bonuses level rather than pouring everything into one
+    const stat = this.towerAttackUpgradePercent <= this.towerSpeedUpgradePercent ? "attack" : "haste";
+    if (this.rollTowerUpgrade(slot, stat)) this.resolveUpgradeRoll();
+  }
+
+  private tickAutoArrange(): void {
+    if (this.state.board.length < 2 || this.state.board.length === this.lastArrangedBoardSize) return;
+    this.lastArrangedBoardSize = this.state.board.length;
+    this.sortUnitsByType(false);
   }
 
   summonToFirstEmpty(): boolean {
@@ -615,9 +670,10 @@ export class GameSimulation {
     return true;
   }
 
-  sortUnitsByType(): boolean {
+  /** `announce` is off for auto arranging, which would otherwise toast every change. */
+  sortUnitsByType(announce = true): boolean {
     if (this.state.board.length < 2) {
-      this.events.push({ type: "message", text: "정렬할 유닛이 더 필요해요." });
+      if (announce) this.events.push({ type: "message", text: "정렬할 유닛이 더 필요해요." });
       return false;
     }
 
@@ -627,7 +683,7 @@ export class GameSimulation {
       ...this.state,
       board: board.map((unit, index) => ({ ...unit, ...positions[index]! })),
     };
-    this.events.push({ type: "message", text: "유니크 우선으로 같은 종류끼리 정렬했어요." });
+    if (announce) this.events.push({ type: "message", text: "유니크 우선으로 같은 종류끼리 정렬했어요." });
     return true;
   }
 

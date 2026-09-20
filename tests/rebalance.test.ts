@@ -24,12 +24,95 @@ test('auto summon buys cheap while slots are free and dense as the board fills',
   expect(chooseAutoSummon(0.9, 9, costs)).toBeNull();
   expect(chooseAutoSummon(0, 0, costs)).toBeNull();
 });
-test('auto progress summons and merges on its own', () => {
+const tower = (id: string, definitionId: string, extra: Record<string, unknown> = {}) =>
+  ({ instanceId: id, definitionId, x: 120, y: 148, cooldownMs: 1e9, ...extra }) as any;
+const runAuto = (sim: GameSimulation, ms = 10_000) => {
+  for (let t = 0; t < ms; t += 100) {
+    sim.update(100);
+    if (sim.pendingReward) { sim.pendingReward = false; sim.rewardChoices = []; }
+  }
+};
+
+test('auto upgrade raises the whole guard and pays with the cheapest tower', () => {
+  const sim = new GameSimulation(createDefaultMetaProgress(), createSeededRng(4));
+  sim.state.baseHealth = sim.state.maxBaseHealth = 1e9;
+  sim.state.gold = 4000;
+  // the second tower has been upgraded before, so it is the dearer one to use
+  sim.state.board = [tower('a', 'common-single'), tower('b', 'common-area', { upgradeCount: 6 })];
+  sim.autoUpgrade = true;
+
+  runAuto(sim, 3000);
+
+  expect(sim.towerAttackUpgradePercent + sim.towerSpeedUpgradePercent).toBeGreaterThan(0);
+  // it buys through the untouched tower until that tower's own price catches up
+  // with the dearer one, then keeps the two level: always the cheapest seat
+  const [cheap, dear] = [sim.state.board[0]!.upgradeCount ?? 0, sim.state.board[1]!.upgradeCount ?? 0];
+  expect(cheap).toBeGreaterThan(0);
+  expect(dear).toBeGreaterThanOrEqual(6);
+  if (dear > 6) expect(cheap).toBeGreaterThanOrEqual(6);
+  expect(Math.abs(cheap - dear)).toBeLessThanOrEqual(1);
+  // and it did not summon, because that toggle is off
+  expect(sim.state.board).toHaveLength(2);
+});
+
+test('auto upgrade keeps attack and speed level with each other', () => {
+  const sim = new GameSimulation(createDefaultMetaProgress(), createSeededRng(4));
+  sim.state.baseHealth = sim.state.maxBaseHealth = 1e9;
+  sim.state.gold = 100000;
+  sim.state.board = [tower('a', 'common-single'), tower('b', 'common-area')];
+  sim.autoUpgrade = true;
+
+  runAuto(sim, 20_000);
+
+  const gap = Math.abs(sim.towerAttackUpgradePercent - sim.towerSpeedUpgradePercent);
+  expect(sim.towerAttackUpgradePercent).toBeGreaterThan(0);
+  expect(sim.towerSpeedUpgradePercent).toBeGreaterThan(0);
+  // one roll of headroom, never a runaway on one side
+  expect(gap).toBeLessThanOrEqual(5);
+});
+
+test('auto arrange reorders as the guard changes, and only then', () => {
+  const sim = new GameSimulation(createDefaultMetaProgress(), createSeededRng(4));
+  sim.state.baseHealth = sim.state.maxBaseHealth = 1e9;
+  sim.state.board = [tower('a', 'common-support'), tower('b', 'common-single'), tower('c', 'common-area')];
+  sim.autoArrange = true;
+
+  runAuto(sim, 1000);
+  const arranged = sim.state.board.map(u => u.instanceId).join(',');
+  const positions = sim.state.board.map(u => `${u.x},${u.y}`).join(' ');
+  expect(positions).not.toBe('120,148 120,148 120,148');
+  // arranging is silent, or it would toast on every change
+  expect(sim.drainEvents().some(e => e.type === 'message' && e.text.includes('정렬'))).toBe(false);
+
+  runAuto(sim, 1000);
+  expect(sim.state.board.map(u => u.instanceId).join(',')).toBe(arranged);
+});
+
+test('the four automations are independent', () => {
+  const sim = new GameSimulation(createDefaultMetaProgress(), createSeededRng(4));
+  sim.state.baseHealth = sim.state.maxBaseHealth = 1e9;
+  sim.state.gold = 5000;
+  const before = sim.state.board.length;
+
+  // everything off: nothing moves
+  runAuto(sim, 2000);
+  expect(sim.state.board.length).toBe(before);
+  expect(sim.state.gold).toBe(5000);
+  expect(sim.towerAttackUpgradePercent).toBe(0);
+
+  // summon only: board grows, no roulette
+  sim.autoSummon = true;
+  runAuto(sim, 3000);
+  expect(sim.state.board.length).toBeGreaterThan(before);
+  expect(sim.towerAttackUpgradePercent + sim.towerSpeedUpgradePercent).toBe(0);
+});
+test('auto summon builds and merges an army on its own', () => {
   const sim = new GameSimulation(createDefaultMetaProgress(), createSeededRng(9));
   sim.state.baseHealth = sim.state.maxBaseHealth = 1e9;
   sim.state.gold = 5000;
   const startingBoard = sim.state.board.length;
   sim.autoProgress = true;
+  sim.autoSummon = true;
 
   for (let t = 0; t < 30_000; t += 100) {
     sim.update(100);
@@ -42,7 +125,7 @@ test('auto progress summons and merges on its own', () => {
   const best = Math.max(...sim.state.board.map(u => getRarityIndex(getUnitDefinition(u.definitionId).rarity)));
   expect(best).toBeGreaterThan(getRarityIndex('hero'));
 });
-test('auto progress off leaves the board alone', () => {
+test('auto summon off leaves the board alone', () => {
   const sim = new GameSimulation(createDefaultMetaProgress(), createSeededRng(9));
   sim.state.baseHealth = sim.state.maxBaseHealth = 1e9;
   sim.state.gold = 5000;

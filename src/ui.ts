@@ -32,7 +32,7 @@ export function createUi(sim: GameSimulation, persistProgress = true): UiHandle 
   <section class="game-layout">
    <div class="battle-column"><div class="battle-hud"><div class="wave-stat"><span id="difficulty-label" class="stat-label">보통 · 현재 웨이브</span><strong><span id="wave-count">00</span><small> / ${MAX_WAVES}</small></strong></div><div class="health-stat"><div><span>${icon('shield')} 성채 내구도</span><b id="hp-count"></b></div><div class="health-track"><i id="hp-bar"></i></div></div><div class="gold-stat">${icon('coin')}<div><span class="stat-label">보유 골드</span><strong id="gold-count"></strong></div></div></div>
     <div id="boss-hud" class="boss-hud" hidden></div><div class="arena-wrap"><div id="game-root"></div><div class="arena-topline"><span id="phase-chip" class="phase-chip"></span><span id="timer-chip"></span></div><div class="arena-caption"><span class="live-dot"></span> 달빛의 정원 <small>방어 구역</small></div><div id="toast" class="toast" role="status" aria-live="polite"></div><div id="pause-overlay" class="pause-overlay hidden"><span>${icon('pause')}</span><h2>잠시, 숨 고르기</h2><p>계속하려면 일시정지 버튼 또는 Space</p></div></div>
-    <div class="battle-toolbar"><div class="speed-controls"><button id="pause-button" class="icon-button" aria-label="일시정지">${icon('pause')}</button><span class="divider"></span>${[1, 2, 3, 5, 10, ...(import.meta.env.DEV ? [20] : [])].map(s => `<button data-speed="${s}" class="speed-button ${s === 1 ? 'active' : ''} ${s >= 10 ? 'operator-speed' : ''}" aria-label="${s}배속${s >= 10 ? ' 운영자용' : ''}" title="${s >= 10 ? '운영자용 고속 테스트' : `${s}배속`}">${s}×${s >= 10 ? '<small>운영자</small>' : ''}</button>`).join('')}</div><button id="auto-progress" class="quiet-button" aria-pressed="false">자동진행 OFF</button><span class="kill-count">처치 <b id="kill-count">0</b></span><button id="wave-button" class="wave-button">${icon('play')} 원정 시작</button></div>
+    <div class="battle-toolbar"><div class="speed-controls"><button id="pause-button" class="icon-button" aria-label="일시정지">${icon('pause')}</button><span class="divider"></span>${[1, 2, 3, 5, 10, ...(import.meta.env.DEV ? [20] : [])].map(s => `<button data-speed="${s}" class="speed-button ${s === 1 ? 'active' : ''} ${s >= 10 ? 'operator-speed' : ''}" aria-label="${s}배속${s >= 10 ? ' 운영자용' : ''}" title="${s >= 10 ? '운영자용 고속 테스트' : `${s}배속`}">${s}×${s >= 10 ? '<small>운영자</small>' : ''}</button>`).join('')}</div><div class="auto-toggles"><span class="auto-label">자동</span><button id="auto-progress" class="auto-toggle" aria-pressed="false" title="웨이브 시작과 축복 선택을 자동으로 합니다.">진행</button><button id="auto-summon" class="auto-toggle" aria-pressed="false" title="보드 여유에 따라 수호자·고급·전설 소환을 고르고, 합성으로 슬롯을 회수합니다.">소환</button><button id="auto-upgrade" class="auto-toggle" aria-pressed="false" title="가장 싼 타워로 값을 치러 수호대 전체 공격력·공격속도 룰렛을 돌립니다.">강화</button><button id="auto-arrange" class="auto-toggle" aria-pressed="false" title="수호대가 늘거나 줄 때마다 같은 종류끼리 다시 정렬합니다.">배치</button></div><span class="kill-count">처치 <b id="kill-count">0</b></span><button id="wave-button" class="wave-button">${icon('play')} 원정 시작</button></div>
     <div class="journey-strip"><span>원정의 이정표</span><div id="milestones">${[1, 20, 40, 60, 80, 100, 120].map(n => `<span data-milestone="${n}"><i>${n === 1 ? '·' : icon('diamond')}</i><small>${n}</small></span>`).join('')}</div><b>${MAX_WAVES}<br><small>최종 방어</small></b></div>
    </div>
    <aside class="command-panel"><div class="panel-heading"><h2>수호대 편성</h2><span id="unit-count">0 / ${MAX_TOWERS}</span></div>
@@ -45,7 +45,7 @@ export function createUi(sim: GameSimulation, persistProgress = true): UiHandle 
     <div class="super-access"><button id="super-forge-button">${icon('diamond')} 슈퍼유니크 각성</button><button id="dragon-shop-button">${icon('swords')} 드래곤 상점</button></div><button id="blessings-button" class="blessings-button"><span>${icon('book')} 원정 축복</span><b id="blessings-count">0개</b></button><button id="skill-toggle" class="growth-button"><span>${icon('moon')} 영구 성장</span><span id="shard-count"></span></button>
    </aside>
   </section>
-  <section class="roster-panel"><div class="roster-heading"><div><h2>나의 수호자</h2><span id="roster-hint">불멸 ${IMMORTAL_MERGE_COUNT}개 → 같은 유형 유니크 · 유니크 동시 보유 최대 2명</span></div><div class="roster-tools"><button id="sort-button" class="quiet-button">자동 배치</button><select id="merge-rarity" aria-label="합성할 타워 등급">${RARITIES.filter(r=>r.id!=='unique').map(r=>`<option value="${r.id}">${r.label}</option>`).join('')}</select><button id="stage-merge-button" class="quiet-button">단계별 합성</button><button id="bulk-merge-button" class="quiet-button">일괄 합성 <span id="merge-count">0</span></button></div></div><div id="roster" class="roster"></div></section>
+  <section class="roster-panel"><div class="roster-heading"><div><h2>나의 수호자</h2><span id="roster-hint">불멸 ${IMMORTAL_MERGE_COUNT}개 → 같은 유형 유니크 · 유니크 동시 보유 최대 2명</span></div><div class="roster-tools"><button id="sort-button" class="quiet-button">지금 정렬</button><select id="merge-rarity" aria-label="합성할 타워 등급">${RARITIES.filter(r=>r.id!=='unique').map(r=>`<option value="${r.id}">${r.label}</option>`).join('')}</select><button id="stage-merge-button" class="quiet-button">단계별 합성</button><button id="bulk-merge-button" class="quiet-button">일괄 합성 <span id="merge-count">0</span></button></div></div><div id="roster" class="roster"></div></section>
   <footer><span>${icon('moon')} 달빛 수호대</span><p>Q 소환 <i>·</i> W 고급 <i>·</i> A 전설 <i>·</i> E 결계 <i>·</i> Space 일시정지</p><span>성장 기록 자동 저장</span></footer>
  </main><dialog id="game-dialog" aria-labelledby="dialog-title"><div id="dialog-content"></div></dialog>`;
     let scene: GameScene | null = null, selected: number | null = null, speed = 1, paused = false, muted = true, dialogKind = '', rosterKey = '', saved = JSON.stringify(sim.meta), toastTimer = 0;
@@ -104,6 +104,9 @@ export function createUi(sim: GameSimulation, persistProgress = true): UiHandle 
     });
     button('sort-button', () => { sim.sortUnitsByType(); scene?.clearSelection(); });
     button('auto-progress', () => { sim.autoProgress = !sim.autoProgress; });
+    button('auto-summon', () => { sim.autoSummon = !sim.autoSummon; });
+    button('auto-upgrade', () => { sim.autoUpgrade = !sim.autoUpgrade; });
+    button('auto-arrange', () => { sim.autoArrange = !sim.autoArrange; });
     button('stage-merge-button', () => { sim.bulkMergeAll(q<HTMLSelectElement>('merge-rarity').value as typeof RARITIES[number]['id']); scene?.clearSelection(); });
     button('bulk-merge-button', () => { sim.bulkMergeAll(); scene?.clearSelection(); });
     button('sell-button', () => { if (selected !== null)
@@ -216,9 +219,8 @@ export function createUi(sim: GameSimulation, persistProgress = true): UiHandle 
         q('battle-title').style.color = theme.accent;
         q('battle-subtitle').textContent = theme.subtitle;
         q('difficulty-label').textContent = `${sim.difficulty.label} · 현재 웨이브`;
-        q('auto-progress').textContent = `자동진행 ${sim.autoProgress ? 'ON' : 'OFF'}`;
-        q('auto-progress').title = '웨이브 시작·축복 선택에 더해 소환과 합성까지 자동으로 진행합니다.';
-        q('auto-progress').setAttribute('aria-pressed', String(sim.autoProgress));
+        for (const [id, on] of [['auto-progress', sim.autoProgress], ['auto-summon', sim.autoSummon], ['auto-upgrade', sim.autoUpgrade], ['auto-arrange', sim.autoArrange]] as const)
+            q(id).setAttribute('aria-pressed', String(on));
         const bosses = sim.enemies.filter(e => e.isBoss && e.hp > 0);
         const bossHud = q('boss-hud');
         bossHud.hidden = bosses.length === 0;
