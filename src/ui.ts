@@ -217,6 +217,7 @@ export function createUi(sim: GameSimulation, persistProgress = true): UiHandle 
         q('battle-subtitle').textContent = theme.subtitle;
         q('difficulty-label').textContent = `${sim.difficulty.label} · 현재 웨이브`;
         q('auto-progress').textContent = `자동진행 ${sim.autoProgress ? 'ON' : 'OFF'}`;
+        q('auto-progress').title = '웨이브 시작·축복 선택에 더해 소환과 합성까지 자동으로 진행합니다.';
         q('auto-progress').setAttribute('aria-pressed', String(sim.autoProgress));
         const bosses = sim.enemies.filter(e => e.isBoss && e.hp > 0);
         const bossHud = q('boss-hud');

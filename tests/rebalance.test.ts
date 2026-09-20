@@ -1,10 +1,56 @@
 import { expect, test } from 'vitest';
-import { createMergeCandidates, createSeededRng, createDefaultMetaProgress, skillTracks } from '../src/game/systems';
+import { chooseAutoSummon, createMergeCandidates, createSeededRng, createDefaultMetaProgress, getRarityIndex, skillTracks } from '../src/game/systems';
+import { getUnitDefinition } from '../src/game/units';
 import { UNIQUE_UNIT_MAX_LEVEL } from '../src/game/units';
 import { REWARD_POOL } from '../src/game/upgrades';
 import { GameSimulation } from '../src/game/simulation';
 import { refundRetiredSkills } from '../src/game/skills';
 
+test('auto summon buys cheap while slots are free and dense as the board fills', () => {
+  const costs = { normal: 10, advanced: 50, legendary: 150 };
+  // plenty of slots: the guardian summon is the gold-efficient buy
+  expect(chooseAutoSummon(0, 1000, costs)).toBe('normal');
+  expect(chooseAutoSummon(0.59, 1000, costs)).toBe('normal');
+  // slots tightening
+  expect(chooseAutoSummon(0.6, 1000, costs)).toBe('advanced');
+  expect(chooseAutoSummon(0.84, 1000, costs)).toBe('advanced');
+  // slots scarce: pay for density
+  expect(chooseAutoSummon(0.85, 1000, costs)).toBe('legendary');
+  expect(chooseAutoSummon(1, 1000, costs)).toBe('legendary');
+  // it never picks a tier it cannot pay for; it steps down to the best it can
+  expect(chooseAutoSummon(0.9, 100, costs)).toBe('advanced');
+  expect(chooseAutoSummon(0.9, 40, costs)).toBe('normal');
+  expect(chooseAutoSummon(0.7, 40, costs)).toBe('normal');
+  expect(chooseAutoSummon(0.9, 9, costs)).toBeNull();
+  expect(chooseAutoSummon(0, 0, costs)).toBeNull();
+});
+test('auto progress summons and merges on its own', () => {
+  const sim = new GameSimulation(createDefaultMetaProgress(), createSeededRng(9));
+  sim.state.baseHealth = sim.state.maxBaseHealth = 1e9;
+  sim.state.gold = 5000;
+  const startingBoard = sim.state.board.length;
+  sim.autoProgress = true;
+
+  for (let t = 0; t < 30_000; t += 100) {
+    sim.update(100);
+    if (sim.pendingReward) { sim.pendingReward = false; sim.rewardChoices = []; }
+  }
+
+  expect(sim.state.board.length).toBeGreaterThan(startingBoard);
+  expect(sim.state.gold).toBeLessThan(5000);
+  // merging happened, so the board reaches grades no summon of this tier rolls
+  const best = Math.max(...sim.state.board.map(u => getRarityIndex(getUnitDefinition(u.definitionId).rarity)));
+  expect(best).toBeGreaterThan(getRarityIndex('hero'));
+});
+test('auto progress off leaves the board alone', () => {
+  const sim = new GameSimulation(createDefaultMetaProgress(), createSeededRng(9));
+  sim.state.baseHealth = sim.state.maxBaseHealth = 1e9;
+  sim.state.gold = 5000;
+  const before = sim.state.board.length;
+  for (let t = 0; t < 10_000; t += 100) sim.update(100);
+  expect(sim.state.board.length).toBe(before);
+  expect(sim.state.gold).toBe(5000);
+});
 test('immortal fusion produces uniques; lower fusion never does', () => {
   const rng = createSeededRng(12);
   expect(createMergeCandidates('immortal-single', rng).every(u => u.uniqueAbility)).toBe(true);

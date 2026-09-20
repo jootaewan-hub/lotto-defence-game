@@ -6,6 +6,7 @@ import { TOWER_SPAWN, clampTowerPosition } from "./geometry";
 import {
   MAX_WAVES,
   buildWaves,
+  chooseAutoSummon,
   getBossEncounter,
   getMergeRequirementFor,
   createInitialRunState,
@@ -96,6 +97,9 @@ const BASE_SUMMON_COST = 10;
 const ADVANCED_SUMMON_COST_MULTIPLIER = 5;
 /** Three advanced summons, so the tiers stay in a readable ratio. */
 const LEGENDARY_SUMMON_COST_MULTIPLIER = ADVANCED_SUMMON_COST_MULTIPLIER * 3;
+
+/** Auto play acts on this cadence so it stays watchable and does not flood the log. */
+const AUTO_ACTION_INTERVAL_MS = 250;
 const SUMMONS_PER_COST_INCREASE = 10;
 const RARE_PITY_THRESHOLD = 7;
 const EPIC_PITY_THRESHOLD = 16;
@@ -119,6 +123,7 @@ export class GameSimulation {
   meta: MetaProgress;
   pendingMerge: MergePrompt | null = null;
   autoProgress = false;
+  private autoActionCooldownMs = 0;
   pendingReward = false;
   upgrades: ExpeditionUpgrades = {};
   rewardChoices: RewardDefinition[] = [];
@@ -483,6 +488,8 @@ export class GameSimulation {
       return;
     }
 
+    if (this.autoProgress) this.tickAutoPlay(deltaMs);
+
     this.frostCooldownMs = Math.max(0, this.frostCooldownMs - deltaMs);
     if (this.tickNextWaveDelay(deltaMs)) {
       return;
@@ -495,6 +502,42 @@ export class GameSimulation {
     attackEnemies(this, deltaMs);
     this.tickWaveTimer(deltaMs);
     this.checkWaveCompletion();
+  }
+
+  /**
+   * One action per cadence: merge if anything can merge, otherwise summon at the
+   * tier the board's fullness argues for. Affordability is checked before
+   * summoning so a broke run does not log a refusal every tick.
+   */
+  private tickAutoPlay(deltaMs: number): void {
+    this.autoActionCooldownMs -= deltaMs;
+    if (this.autoActionCooldownMs > 0) return;
+    this.autoActionCooldownMs = AUTO_ACTION_INTERVAL_MS;
+
+    if (this.pendingMerge || this.pendingReward || this.pendingRoll) return;
+
+    // Merging first: it is what turns cheap summons into high tiers and hands
+    // the board slots back, which is what keeps summoning affordable at all.
+    if (this.getMergeableGroups().length > 0) {
+      this.bulkMergeAll();
+      return;
+    }
+
+    if (this.state.board.length >= MAX_TOWERS) return;
+
+    if (this.state.freeSummons >= 1) {
+      this.summonToFirstEmpty();
+      return;
+    }
+
+    const choice = chooseAutoSummon(this.state.board.length / MAX_TOWERS, this.state.gold, {
+      normal: this.summonCost,
+      advanced: this.advancedSummonCost,
+      legendary: this.legendarySummonCost,
+    });
+    if (choice === "legendary") this.summonLegendary();
+    else if (choice === "advanced") this.summonAdvanced();
+    else if (choice === "normal") this.summonToFirstEmpty();
   }
 
   summonToFirstEmpty(): boolean {

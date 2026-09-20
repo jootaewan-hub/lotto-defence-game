@@ -58,6 +58,26 @@ const SUMMON_CEILING: Record<SummonKind, RarityId> = {
   legendary: "immortal",
 };
 
+/**
+ * Which summon auto play buys depends on what is scarce. Per gold a guardian
+ * summon is worth about 3.1 advanced summons and 5.1 legendary ones; per board
+ * slot a legendary is worth about 2.9 guardians. So it buys cheap while slots
+ * are free and buys dense as the board fills.
+ */
+export const AUTO_ADVANCED_FILL_RATIO = 0.6;
+export const AUTO_LEGENDARY_FILL_RATIO = 0.85;
+
+/** The summon auto play should buy, or null when nothing is affordable. */
+export function chooseAutoSummon(
+  fillRatio: number,
+  gold: number,
+  costs: Record<SummonKind, number>,
+): SummonKind | null {
+  if (fillRatio >= AUTO_LEGENDARY_FILL_RATIO && gold >= costs.legendary) return "legendary";
+  if (fillRatio >= AUTO_ADVANCED_FILL_RATIO && gold >= costs.advanced) return "advanced";
+  return gold >= costs.normal ? "normal" : null;
+}
+
 /** Only the legendary summon can produce a unique, and only this often. */
 export const LEGENDARY_UNIQUE_CHANCE = 0.005;
 
