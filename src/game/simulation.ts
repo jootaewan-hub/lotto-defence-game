@@ -93,7 +93,8 @@ export type SimulationEvent =
 
 const BASE_SUMMON_COST = 10;
 const ADVANCED_SUMMON_COST_MULTIPLIER = 5;
-const LEGENDARY_SUMMON_COST_MULTIPLIER = 20;
+/** Three advanced summons, so the tiers stay in a readable ratio. */
+const LEGENDARY_SUMMON_COST_MULTIPLIER = ADVANCED_SUMMON_COST_MULTIPLIER * 3;
 const SUMMONS_PER_COST_INCREASE = 10;
 const RARE_PITY_THRESHOLD = 7;
 const EPIC_PITY_THRESHOLD = 16;

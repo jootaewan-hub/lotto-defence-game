@@ -58,6 +58,15 @@ test('each boss tier gets its own clear time', () => {
   expect(getBossEncounter(20)!.durationMs).toBe(115_000);
   expect(getBossEncounter(120)!.durationMs).toBe(135_000);
 });
+test('boss stages past wave 50 get twenty seconds more, the final boss excepted', () => {
+  expect(getBossEncounter(50)!.durationMs).toBe(95_000);
+  expect(getBossEncounter(55)!.durationMs).toBe(80_000);
+  expect(getBossEncounter(70)!.durationMs).toBe(115_000);
+  expect(getBossEncounter(80)!.durationMs).toBe(135_000);
+  expect(getBossEncounter(120)!.durationMs).toBe(135_000);
+  // the bonus lands exactly once, at the first boss past the threshold
+  expect(getBossEncounter(45)!.durationMs).toBe(60_000);
+});
 test('keep durability stays whole even with legacy quarter-value skills', () => {
   // legacy defence-1 is worth 5, counted at a quarter, which used to show 21.25
   for (const skills of [['defense-1'], ['defense-1','defense-3'], ['defense-1','defense-3','defense-5'], ['economy-1']]) {

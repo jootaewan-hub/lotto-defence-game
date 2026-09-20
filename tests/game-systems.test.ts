@@ -346,7 +346,7 @@ describe("lotto defence game systems", () => {
     simulation.state = { ...simulation.state, gold: 100 };
 
     expect(simulation.advancedSummonCost).toBe(simulation.summonCost * 5);
-    expect(simulation.legendarySummonCost).toBe(simulation.summonCost * 20);
+    expect(simulation.legendarySummonCost).toBe(simulation.advancedSummonCost * 3);
     expect(simulation.summonAdvanced()).toBe(true);
     expect(simulation.state.gold).toBe(50);
 

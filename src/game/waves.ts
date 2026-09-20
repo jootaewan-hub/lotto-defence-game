@@ -18,6 +18,14 @@ const TRUE_BOSS_DURATION_MS = 115_000;
 const FINAL_BOSS_DURATION_MS = 135_000;
 
 /**
+ * Past wave 50 the mid, named and true boss tiers get longer to clear, matching
+ * where boss health and armor already change pace. The final boss is a fixed
+ * encounter and keeps its own time.
+ */
+const LATE_BOSS_WAVE = 50;
+const LATE_BOSS_DURATION_BONUS_MS = 20_000;
+
+/**
  * How many mid bosses a mid boss stage sends. Named, true and final bosses are
  * single opponents. This is declared rather than left to fall out of the spawn
  * interval and the stage length, which is what used to decide it.
@@ -74,13 +82,10 @@ function createStage(number: number, kind: StageKind): WaveDefinition {
     speedMultiplier: isNamedBoss ? 0.7 + tier * 0.01 : isBoss ? 0.75 + tier * 0.015 : 1 + tier * 0.0175,
     durationMs: isFinalBoss
       ? FINAL_BOSS_DURATION_MS
-      : isTrueBoss
-        ? TRUE_BOSS_DURATION_MS
-        : isNamedBoss
-          ? NAMED_BOSS_DURATION_MS
-          : isBoss
-            ? MID_BOSS_DURATION_MS
-            : 28_000 + tier * 2_000,
+      : isBoss
+        ? (isTrueBoss ? TRUE_BOSS_DURATION_MS : isNamedBoss ? NAMED_BOSS_DURATION_MS : MID_BOSS_DURATION_MS)
+          + (number > LATE_BOSS_WAVE ? LATE_BOSS_DURATION_BONUS_MS : 0)
+        : 28_000 + tier * 2_000,
   };
 }
 
