@@ -69,6 +69,19 @@ export function getTrueBossDefinition(id: TrueBossId): TrueBossDefinition {
       speedMultiplier: 1.02,
       rewardMultiplier: 2.25,
     },
+    // Wave 120 only. Sits one tier above the undead demon king so the last wave
+    // is the hardest single enemy in a run.
+    "eclipse-sovereign": {
+      id,
+      label: "월식의 군주",
+      variantId: "blackguard",
+      tint: 0xf8fafc,
+      tier: 11,
+      hpMultiplier: 2.15,
+      armorMultiplier: 1.8,
+      speedMultiplier: 1,
+      rewardMultiplier: 3,
+    },
   };
   return bosses[id];
 }

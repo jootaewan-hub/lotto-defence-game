@@ -20,7 +20,7 @@ test('all four campaigns preserve the army, gold and upgrades, and only Insane w
     sim.state.wave = 119;
     sim.startNextWave();
     const gold = sim.state.gold;
-    sim.update(75000);
+    sim.update(135000);
     expect(sim.state.board).toBe(board);
     expect(sim.upgrades.attack).toBe(15);
     expect(sim.state.gold).toBe(gold);

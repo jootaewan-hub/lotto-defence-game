@@ -12,6 +12,7 @@ import {
   getFailureGrowthShards,
   getSkillEffectTotal,
   pickRarity,
+  rollSummonUniqueUnit,
   type SummonKind,
 } from "./systems";
 import type { Rng } from "./rng";
@@ -91,6 +92,7 @@ export type SimulationEvent =
 
 const BASE_SUMMON_COST = 10;
 const ADVANCED_SUMMON_COST_MULTIPLIER = 5;
+const LEGENDARY_SUMMON_COST_MULTIPLIER = 20;
 const SUMMONS_PER_COST_INCREASE = 10;
 const RARE_PITY_THRESHOLD = 7;
 const EPIC_PITY_THRESHOLD = 16;
@@ -357,6 +359,10 @@ export class GameSimulation {
     return Math.max(1, Math.round((BASE_SUMMON_COST + summonPressure) * (1 - discount)));
   }
 
+  get legendarySummonCost(): number {
+    return this.summonCost * LEGENDARY_SUMMON_COST_MULTIPLIER;
+  }
+
   get advancedSummonCost(): number {
     return this.summonCost * ADVANCED_SUMMON_COST_MULTIPLIER;
   }
@@ -456,6 +462,10 @@ export class GameSimulation {
     return this.summon("advanced");
   }
 
+  summonLegendary(): boolean {
+    return this.summon("legendary");
+  }
+
   private summon(kind: SummonKind): boolean {
     if (this.state.status === 'won' || this.state.status === 'lost' || this.pendingMerge || this.pendingReward || this.pendingRoll) return false;
     if (this.state.board.length >= MAX_TOWERS) {
@@ -465,7 +475,7 @@ export class GameSimulation {
     if (kind === "normal" && this.state.freeSummons >= 1) {
       this.state = { ...this.state, freeSummons: this.state.freeSummons - 1 };
     } else {
-      const cost = kind === "advanced" ? this.advancedSummonCost : this.summonCost;
+      const cost = kind === "legendary" ? this.legendarySummonCost : kind === "advanced" ? this.advancedSummonCost : this.summonCost;
       if (this.state.gold < cost) {
         this.events.push({ type: "message", text: "골드가 부족해요." });
         return false;
@@ -487,7 +497,7 @@ export class GameSimulation {
     });
     this.successfulSummons += 1;
     this.state = { ...this.state, board };
-    const prefix = pityActivated ? "행운 보정! " : kind === "advanced" ? "고급 소환! " : "";
+    const prefix = pityActivated ? "행운 보정! " : kind === "legendary" ? "전설 소환! " : kind === "advanced" ? "고급 소환! " : "";
     const levelSuffix = unit.uniqueAbility ? ` Lv.${uniqueLevel}` : "";
     this.events.push({ type: "message", text: `${prefix}${getRarity(unit.rarity).label} ${unit.name}${levelSuffix} 소환!` });
     return true;
@@ -850,6 +860,15 @@ export class GameSimulation {
   }
 
   private rollSummonUnit(kind: SummonKind): { unit: UnitDefinition; pityActivated: boolean } {
+    // Uniques are not a rarity, so the legendary summon draws them ahead of the
+    // rarity table. A unique skips the pity counters entirely.
+    if (kind === "legendary") {
+      const uniqueUnit = rollSummonUniqueUnit(this.rng);
+      if (uniqueUnit) {
+        return { unit: uniqueUnit, pityActivated: false };
+      }
+    }
+
     let unit: UnitDefinition | null = null;
     let rarity: RarityId = pickRarity(this.rng, kind);
     let pityActivated = false;

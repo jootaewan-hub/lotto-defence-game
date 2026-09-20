@@ -88,7 +88,8 @@ test('boss tiers use the reduced health multipliers', () => {
   const late = (w: number) => (1 + Math.max(0, w - 20) * 0.0325) * 1.006 ** (w - 1);
   expect(waves[4]!.healthMultiplier).toBeCloseTo(5.6 * late(5));
   expect(waves[9]!.healthMultiplier).toBeCloseTo((5.6 + 0.95) * 1.5 * late(10));
-  expect(waves[29]!.healthMultiplier).toBeCloseTo((5.6 + 0.95 * 5) * 1.5 * 1.15 * late(30));
+  expect(waves[19]!.healthMultiplier).toBeCloseTo((5.6 + 0.95 * 3) * 1.5 * 1.15 * late(20));
+  expect(waves[29]!.healthMultiplier).toBeCloseTo((5.6 + 0.95 * 5) * 1.5 * late(30));
 });
 test('spawned mid boss, boss and true boss health drop on normal difficulty', () => {
   const spawn = (wave: number) => {

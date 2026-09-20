@@ -18,7 +18,7 @@ export type UnitAbilityKind = "multishot" | "slow" | "poison" | "freeze" | "bers
 
 export type EnemyVariantId = "grunt" | "blade" | "shaman" | "blackguard" | "redguard" | "warlord";
 
-export type TrueBossId = "orc-emperor" | "ogre-king" | "ancient-dragon" | "undead-demon-king";
+export type TrueBossId = "orc-emperor" | "ogre-king" | "ancient-dragon" | "undead-demon-king" | "eclipse-sovereign";
 
 export type BuffStat = "attack" | "attackSpeed";
 
@@ -55,6 +55,8 @@ export interface WaveDefinition {
   durationMs: number;
   isBoss: boolean;
   isTrueBoss: boolean;
+  /** Only the last wave. Final bosses are also true bosses, so existing boss handling still applies. */
+  isFinalBoss: boolean;
   bossId?: TrueBossId;
   trueBossId?: TrueBossId;
 }

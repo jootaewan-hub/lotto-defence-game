@@ -10,30 +10,56 @@ export { createDefaultMetaProgress, getSkillEffectTotal, purchaseSkill, skillTra
 export type * from "./types";
 export { MAX_WAVES, buildWaves } from "./waves";
 
-export type SummonKind = "normal" | "advanced";
+export type SummonKind = "normal" | "advanced" | "legendary";
 
+/** Guardian summon: common through hero. Each table sums to exactly 1. */
 const NORMAL_SUMMON_CHANCES: Partial<Record<RarityId, number>> = {
-  common: 0.459,
-  advanced: 0.255,
-  rare: 0.143,
-  epic: 0.082,
-  hero: 0.041,
-  legendary: 0.02,
+  common: 0.468,
+  advanced: 0.26,
+  rare: 0.146,
+  epic: 0.084,
+  hero: 0.042,
 };
 
+/** Advanced summon: advanced through mythic. */
 const ADVANCED_SUMMON_CHANCES: Partial<Record<RarityId, number>> = {
-  common: 0.2,
-  advanced: 0.28,
-  rare: 0.22,
-  epic: 0.14,
-  hero: 0.08,
-  legendary: 0.045,
-  mythic: 0.025,
-  transcendent: 0.008,
-  immortal: 0.002,
+  advanced: 0.354,
+  rare: 0.279,
+  epic: 0.177,
+  hero: 0.101,
+  legendary: 0.057,
+  mythic: 0.032,
 };
 
-export const ADVANCED_UNIQUE_BASE_CHANCE = 0;
+/**
+ * Legendary summon: epic through immortal, plus the only path to a unique.
+ * The unique is drawn before this table, so the effective rates are these
+ * values times (1 - LEGENDARY_UNIQUE_CHANCE).
+ */
+const LEGENDARY_SUMMON_CHANCES: Partial<Record<RarityId, number>> = {
+  epic: 0.382,
+  hero: 0.271,
+  legendary: 0.191,
+  mythic: 0.106,
+  transcendent: 0.038,
+  immortal: 0.012,
+};
+
+const SUMMON_CHANCES: Record<SummonKind, Partial<Record<RarityId, number>>> = {
+  normal: NORMAL_SUMMON_CHANCES,
+  advanced: ADVANCED_SUMMON_CHANCES,
+  legendary: LEGENDARY_SUMMON_CHANCES,
+};
+
+/** Highest rarity each summon kind can reach, used when a roll overruns the table. */
+const SUMMON_CEILING: Record<SummonKind, RarityId> = {
+  normal: "hero",
+  advanced: "mythic",
+  legendary: "immortal",
+};
+
+/** Only the legendary summon can produce a unique, and only this often. */
+export const LEGENDARY_UNIQUE_CHANCE = 0.005;
 
 export function createInitialRunState(meta: MetaProgress = createDefaultMetaProgress()): RunState {
   const maxBaseHealth = 20 + getSkillEffectTotal(meta, "baseHealthBonus");
@@ -63,7 +89,7 @@ export function createSummonSampler(rng: Rng): () => UnitDefinition {
 export function pickRarity(rng: Pick<Rng, "next">, kind: SummonKind = "normal"): RarityId {
   const roll = rng.next();
   let cumulative = 0;
-  const chances = kind === "advanced" ? ADVANCED_SUMMON_CHANCES : NORMAL_SUMMON_CHANCES;
+  const chances = SUMMON_CHANCES[kind];
 
   for (const rarity of RARITIES) {
     cumulative += chances[rarity.id] ?? 0;
@@ -72,11 +98,20 @@ export function pickRarity(rng: Pick<Rng, "next">, kind: SummonKind = "normal"):
     }
   }
 
-  return kind === "advanced" ? RARITIES[RARITIES.length - 1]!.id : "legendary";
+  return SUMMON_CEILING[kind];
 }
 
-export function rollAdvancedUniqueUnit(_rng: Pick<Rng, "next">, _chanceBonus = 0): UnitDefinition | null {
-  return null;
+/**
+ * Draws a unique for the legendary summon. Uniques are not a rarity, so they
+ * cannot live in the rarity table and are rolled ahead of it. Super uniques
+ * stay awakening-only.
+ */
+export function rollSummonUniqueUnit(rng: Pick<Rng, "next" | "pick">): UnitDefinition | null {
+  if (rng.next() >= LEGENDARY_UNIQUE_CHANCE) {
+    return null;
+  }
+  const candidates = UNIT_DEFINITIONS.filter((unit) => unit.uniqueAbility && !unit.superUnique);
+  return candidates.length ? rng.pick(candidates) : null;
 }
 
 export function getFailureGrowthShards(wave: number, defeatedEnemies: number, bonus = 0): number {

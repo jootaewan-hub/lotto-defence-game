@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 import {
-  ADVANCED_UNIQUE_BASE_CHANCE,
+  LEGENDARY_UNIQUE_CHANCE,
   MAX_WAVES,
   RARITIES,
   buildWaves,
@@ -15,8 +15,8 @@ import {
   pickRarity,
   purchaseSkill,
   resolveJackpotReward,
-  rollAdvancedUniqueUnit,
   rollKillGoldReward,
+  rollSummonUniqueUnit,
   skillTracks,
   skillTree,
 } from "../src/game/systems";
@@ -153,7 +153,7 @@ describe("lotto defence game systems", () => {
     expect(simulation.getMergeableGroups()).toEqual([[0, 1, 2], [3, 4, 5]]);
   });
 
-  test("waves contain 120 rounds with bosses every fifth wave and true bosses every thirtieth", () => {
+  test("waves contain 120 rounds with bosses every fifth wave and true bosses every twentieth", () => {
     const waves = buildWaves();
 
     expect(waves).toHaveLength(MAX_WAVES);
@@ -161,7 +161,8 @@ describe("lotto defence game systems", () => {
       Array.from({ length: MAX_WAVES / 5 }, (_, index) => (index + 1) * 5),
     );
     expect(waves.filter((wave) => wave.isTrueBoss).map((wave) => [wave.number, wave.trueBossId])).toEqual([
-      [30, "ancient-dragon"], [60, "ogre-king"], [90, "orc-emperor"], [120, "undead-demon-king"],
+      [20, "orc-emperor"], [40, "ogre-king"], [60, "ancient-dragon"], [80, "undead-demon-king"],
+      [100, "orc-emperor"], [120, "eclipse-sovereign"],
     ]);
   });
 
@@ -296,16 +297,35 @@ describe("lotto defence game systems", () => {
     );
   });
 
-  test("normal summon excludes mythic and higher rarities", () => {
+  test("guardian summon tops out at hero", () => {
     const rng = { next: () => 0.999 };
 
-    expect(pickRarity(rng, "normal")).toBe("legendary");
+    expect(pickRarity(rng, "normal")).toBe("hero");
   });
 
-  test("advanced summons cannot produce uniques, including legacy bonuses", () => {
-    expect(ADVANCED_UNIQUE_BASE_CHANCE).toBe(0);
-    for (const value of [0, .001, .03, .052, .067, .99]) {
-      expect(rollAdvancedUniqueUnit({next: () => value}, 100)).toBeNull();
+  test("advanced summon spans advanced through mythic only", () => {
+    expect(pickRarity({ next: () => 0.0001 }, "advanced")).toBe("advanced");
+    expect(pickRarity({ next: () => 0.999 }, "advanced")).toBe("mythic");
+  });
+
+  test("legendary summon spans epic through immortal", () => {
+    expect(pickRarity({ next: () => 0.0001 }, "legendary")).toBe("epic");
+    expect(pickRarity({ next: () => 0.999 }, "legendary")).toBe("immortal");
+  });
+
+  test("only the legendary summon can roll a unique, at the configured rate", () => {
+    expect(LEGENDARY_UNIQUE_CHANCE).toBe(0.005);
+    const pick = <T,>(items: readonly T[]): T => items[0]!;
+
+    for (const value of [0, .001, .0049]) {
+      const unit = rollSummonUniqueUnit({ next: () => value, pick });
+      expect(unit).not.toBeNull();
+      expect(unit!.uniqueAbility).toBeTruthy();
+      expect(unit!.superUnique).toBeFalsy();
+    }
+
+    for (const value of [.005, .03, .5, .99]) {
+      expect(rollSummonUniqueUnit({ next: () => value, pick })).toBeNull();
     }
   });
 
@@ -320,6 +340,7 @@ describe("lotto defence game systems", () => {
     simulation.state = { ...simulation.state, gold: 100 };
 
     expect(simulation.advancedSummonCost).toBe(simulation.summonCost * 5);
+    expect(simulation.legendarySummonCost).toBe(simulation.summonCost * 20);
     expect(simulation.summonAdvanced()).toBe(true);
     expect(simulation.state.gold).toBe(50);
 
@@ -664,7 +685,7 @@ describe("lotto defence game systems", () => {
 
     expect(simulation.activeWaveCleanupWindowMs).toBe(20_000);
     expect(simulation.state.waveTimeRemainingMs).toBe(20_000);
-    expect(simulation.enemies).toHaveLength(5);
+    expect(simulation.enemies).toHaveLength(6);
     expect(simulation.enemies.every((enemy) => enemy.isBoss)).toBe(true);
 
     simulation.enemies.splice(0);
@@ -676,22 +697,22 @@ describe("lotto defence game systems", () => {
     expect(simulation.state.baseHealth).toBe(baseHealth);
   });
 
-  test("true boss waves provide seventy-five seconds with a forty-five-second final defeat window", () => {
+  test("true boss waves provide one hundred fifteen seconds with a forty-five-second final defeat window", () => {
     const simulation = new GameSimulation(createDefaultMetaProgress(), createSeededRng(19));
-    simulation.state = { ...simulation.state, wave: 29 };
+    simulation.state = { ...simulation.state, wave: 19 };
 
     simulation.startNextWave();
-    const trueBossWave = simulation.waves[29]!;
+    const trueBossWave = simulation.waves[19]!;
 
     expect(trueBossWave.isTrueBoss).toBe(true);
-    expect(trueBossWave.durationMs).toBe(75_000);
+    expect(trueBossWave.durationMs).toBe(115_000);
     expect(simulation.activeWaveCleanupWindowMs).toBe(45_000);
 
-    simulation.update(30_000);
+    simulation.update(70_000);
 
     expect(simulation.state.waveTimeRemainingMs).toBe(45_000);
     expect(simulation.enemies).toHaveLength(1);
-    expect(simulation.enemies[0]!.trueBossId).toBe("ancient-dragon");
+    expect(simulation.enemies[0]!.trueBossId).toBe("orc-emperor");
 
     simulation.update(44_999);
 
@@ -735,17 +756,17 @@ describe("lotto defence game systems", () => {
     expect(bossArmor).toBeGreaterThanOrEqual(lateArmor * 5);
   });
 
-  test("every thirtieth wave spawns a named true boss variant", () => {
+  test("every twentieth wave spawns a named true boss variant", () => {
     const simulation = new GameSimulation(createDefaultMetaProgress(), createSeededRng(19));
 
-    simulation.state = { ...simulation.state, wave: 29 };
+    simulation.state = { ...simulation.state, wave: 19 };
     simulation.startNextWave();
     simulation.update(1);
 
     expect(simulation.enemies[0]).toMatchObject({
       isBoss: true,
-      trueBossId: "ancient-dragon",
-      variantLabel: "고대 드래곤",
+      trueBossId: "orc-emperor",
+      variantLabel: "오크 황제",
     });
     expect(simulation.enemies[0]!.maxHp).toBeGreaterThan(3_000);
   });
@@ -770,12 +791,26 @@ describe("lotto defence game systems", () => {
   test("true boss waves spawn only one enemy", () => {
     const simulation = new GameSimulation(createDefaultMetaProgress(), createSeededRng(19));
 
-    simulation.state = { ...simulation.state, wave: 29 };
+    simulation.state = { ...simulation.state, wave: 19 };
     simulation.startNextWave();
     simulation.update(15_000);
 
     expect(simulation.enemies).toHaveLength(1);
-    expect(simulation.enemies[0]!.trueBossId).toBe("ancient-dragon");
+    expect(simulation.enemies[0]!.trueBossId).toBe("orc-emperor");
+  });
+
+  test("named boss waves carry a boss identity without being true bosses", () => {
+    const simulation = new GameSimulation(createDefaultMetaProgress(), createSeededRng(19));
+
+    simulation.state = { ...simulation.state, wave: 29 };
+    simulation.startNextWave();
+    simulation.update(15_000);
+
+    expect(simulation.waves[29]!.isTrueBoss).toBe(false);
+    expect(simulation.waves[29]!.bossId).toBe("ogre-king");
+    expect(simulation.waves[29]!.durationMs).toBe(95_000);
+    expect(simulation.enemies).toHaveLength(1);
+    expect(simulation.enemies[0]!.variantLabel).toBe("오우거 대왕");
   });
 
   test("kill gold rewards have larger tiers for higher rolls", () => {

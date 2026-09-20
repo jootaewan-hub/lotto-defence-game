@@ -488,25 +488,84 @@ h1 {
 }
 .summon-button {
   position: relative;
+  overflow: hidden;
   display: flex;
   align-items: center;
   gap: 10px;
   width: 100%;
-  padding: 17px 12px;
-  background: linear-gradient(110deg,#dcce9b,#b8a774);
-  border: 1px solid #f6e6bfa0;
+  padding: 13px 12px;
+  border: 1px solid transparent;
   border-radius: 6px;
-  color: #293a34;
-  box-shadow: inset 0 1px 0 #fff6,0 4px 15px #0002;
-  text-align: left
+  text-align: left;
+  transition: background .14s ease,border-color .14s ease,box-shadow .14s ease,transform .14s ease
+}
+.summon-button:disabled {
+  opacity: .42
 }
 .summon-button:hover:not(:disabled) {
-  background: linear-gradient(110deg,#e8dcb0,#ccba86);
-  border-color: #fff2c8
+  transform: translateY(-1px)
 }
 .summon-symbol svg {
-  width: 29px;
-  height: 29px
+  width: 20px;
+  height: 20px
+}
+/* The three summon tiers escalate deliberately: the guardian summon is the
+   plainest button on the panel and the legendary one is the showpiece. */
+.tier-guardian {
+  background: #9d8bb50a;
+  border-color: #9c93c73a;
+  color: #c3bdda
+}
+.tier-guardian:hover:not(:disabled) {
+  background: #9d8bb516;
+  border-color: #b6aee092
+}
+.tier-advanced {
+  background: linear-gradient(112deg,#2b3c60,#212c46);
+  border-color: #7fb4ff4a;
+  color: #dce8ff;
+  box-shadow: inset 0 1px 0 #ffffff14,0 3px 12px #0b142899
+}
+.tier-advanced .summon-symbol svg {
+  width: 23px;
+  height: 23px
+}
+.tier-advanced:hover:not(:disabled) {
+  border-color: #9ecbffcc;
+  box-shadow: inset 0 1px 0 #ffffff26,0 6px 18px #0b1428
+}
+.tier-legendary {
+  padding: 17px 12px;
+  background: linear-gradient(112deg,#f7dc93,#e3b94b 45%,#caa03a);
+  border-color: #ffd97a;
+  color: #2a1f06;
+  box-shadow: inset 0 1px 0 #fff8,0 0 0 1px #ffd97a2e,0 6px 22px #d9a53a33
+}
+.tier-legendary .summon-symbol svg {
+  width: 27px;
+  height: 27px
+}
+.tier-legendary small {
+  opacity: .72
+}
+.tier-legendary:hover:not(:disabled) {
+  background: linear-gradient(112deg,#fff0c0,#f2ce66 45%,#dbb148);
+  border-color: #fff0bd;
+  box-shadow: inset 0 1px 0 #fff9,0 0 0 1px #ffd97a55,0 9px 28px #d9a53a55
+}
+/* Slow sheen sweep, only on the legendary tier. */
+.tier-legendary::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg,#fff0 42%,#ffffff6b 50%,#fff0 58%);
+  transform: translateX(-120%);
+  animation: summon-sheen 4.6s ease-in-out infinite;
+  pointer-events: none
+}
+@keyframes summon-sheen {
+  0%,70% { transform: translateX(-120%) }
+  100% { transform: translateX(120%) }
 }
 .summon-button b {
   display: block;
@@ -537,31 +596,6 @@ kbd {
   position: absolute;
   right: 5px;
   bottom: 3px
-}
-.advanced-button {
-  padding: 11px 12px;
-  border-radius: 5px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  border-color: #9c93c740;
-  background: #9d8bb508;
-  color: #bdb8d9;
-  font-size: 11px
-}
-.advanced-button span {
-  display: flex;
-  align-items: center;
-  gap: 7px
-}
-.advanced-button svg {
-  width: 17px;
-  height: 17px
-}
-.advanced-button b {
-  margin-left: auto;
-  font-size: 12px;
-  font-weight: 500
 }
 .section-title {
   display: flex;
@@ -1188,10 +1222,7 @@ dialog h2 {
   .panel-heading,.panel-description,.summon-actions,.growth-button {
     grid-column: 1/-1
   }
-  .summon-actions {
-    grid-template-columns: 1.2fr 1fr
-  }
-  .advanced-button kbd {
+  .summon-button kbd {
     display: none
   }
   .synergies {
@@ -1342,15 +1373,11 @@ dialog h2 {
   .summon-price {
     font-size: 11px
   }
-  .advanced-button {
-    font-size: 10px;
+  .summon-button {
     padding: 10px 8px
   }
-  .advanced-button b {
-    font-size: 10px
-  }
-  .advanced-button span {
-    gap: 4px
+  .tier-legendary {
+    padding: 13px 8px
   }
   .synergies {
     gap: 3px
@@ -1449,6 +1476,10 @@ dialog h2 {
   }
 }
 @media(prefers-reduced-motion:reduce) {
+  .tier-legendary::after {
+    animation: none;
+    opacity: 0
+  }
   *,*:before,*:after {
     animation: none!important;
     transition: none!important

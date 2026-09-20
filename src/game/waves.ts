@@ -2,6 +2,17 @@ import type { RunState, WaveDefinition } from "./types";
 
 export const MAX_WAVES = 120;
 
+/** Boss cadence: mid boss every 5th wave, named boss every 10th, true boss every 20th, final boss on the last wave. */
+const MID_BOSS_EVERY = 5;
+const NAMED_BOSS_EVERY = 10;
+const TRUE_BOSS_EVERY = 20;
+
+/** Clear time per boss tier. Ordinary waves scale with tier instead. */
+const MID_BOSS_DURATION_MS = 60_000;
+const NAMED_BOSS_DURATION_MS = 95_000;
+const TRUE_BOSS_DURATION_MS = 115_000;
+const FINAL_BOSS_DURATION_MS = 135_000;
+
 /** Mid boss (every 5th wave) health relative to a wave-1 grunt; bosses and true bosses stack on top. */
 const MID_BOSS_BASE_HEALTH = 5.6;
 const MID_BOSS_HEALTH_PER_TIER = 0.95;
@@ -28,9 +39,10 @@ export const DIFFICULTIES: Record<RunState['difficulty'], {
 export function buildWaves(): WaveDefinition[] {
   return Array.from({ length: MAX_WAVES }, (_, index) => {
     const number = index + 1;
-    const isBoss = number % 5 === 0;
-    const isNamedBoss = number % 10 === 0;
-    const isTrueBoss = number % 30 === 0;
+    const isBoss = number % MID_BOSS_EVERY === 0;
+    const isNamedBoss = number % NAMED_BOSS_EVERY === 0;
+    const isTrueBoss = number % TRUE_BOSS_EVERY === 0;
+    const isFinalBoss = number === MAX_WAVES;
     const tier = Math.floor((number - 1) / 5);
     const growthWave = getEnemyGrowthWave(number, isBoss);
     const healthTier = Math.floor((growthWave - 1) / 5);
@@ -42,17 +54,38 @@ export function buildWaves(): WaveDefinition[] {
       number,
       isBoss,
       isTrueBoss,
-      bossId: isNamedBoss && !isTrueBoss ? getTrueBossId(number) : undefined,
-      trueBossId: isTrueBoss ? getTrueBossId(number) : undefined,
+      isFinalBoss,
+      bossId: isNamedBoss && !isTrueBoss ? getNamedBossId(number) : undefined,
+      trueBossId: isFinalBoss ? FINAL_BOSS_ID : isTrueBoss ? getTrueBossId(number) : undefined,
       enemyCount: isBoss ? 1 : 10 + tier * 2 + (number % 5),
       healthMultiplier: baseHealthMultiplier * lateGameHealthMultiplier,
       speedMultiplier: isNamedBoss ? 0.7 + tier * 0.01 : isBoss ? 0.75 + tier * 0.015 : 1 + tier * 0.0175,
-      durationMs: isNamedBoss ? 75_000 : isBoss ? 50_000 : 28_000 + tier * 2_000,
+      durationMs: isFinalBoss
+        ? FINAL_BOSS_DURATION_MS
+        : isTrueBoss
+          ? TRUE_BOSS_DURATION_MS
+          : isNamedBoss
+            ? NAMED_BOSS_DURATION_MS
+            : isBoss
+              ? MID_BOSS_DURATION_MS
+              : 28_000 + tier * 2_000,
     };
   });
 }
 
+const BOSS_CYCLE = ["orc-emperor", "ogre-king", "ancient-dragon", "undead-demon-king"] as const;
+const FINAL_BOSS_ID = "eclipse-sovereign" as const;
+
+/**
+ * Each boss tier indexes the cycle by its own ordinal rather than by a shared
+ * wave/10 index. A shared index would lock each tier to one parity once true
+ * bosses moved to every 20th wave, so only two of the four bosses would ever
+ * appear in either tier.
+ */
 function getTrueBossId(waveNumber: number): WaveDefinition["trueBossId"] {
-  const cycle = ["orc-emperor", "ogre-king", "ancient-dragon", "undead-demon-king"] as const;
-  return cycle[(Math.floor(waveNumber / 10) - 1) % cycle.length];
+  return BOSS_CYCLE[(waveNumber / TRUE_BOSS_EVERY - 1) % BOSS_CYCLE.length];
+}
+
+function getNamedBossId(waveNumber: number): WaveDefinition["bossId"] {
+  return BOSS_CYCLE[Math.floor((waveNumber - NAMED_BOSS_EVERY) / TRUE_BOSS_EVERY) % BOSS_CYCLE.length];
 }

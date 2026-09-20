@@ -2,7 +2,7 @@ import type { DragonItemKind, TowerType, UnitInstance } from './types';
 import { getTowerType, getUnitDefinition, isUniqueUnit } from './units';
 export const MAX_TOWERS = 200;
 export const MAX_ITEM_UPGRADE_LEVEL = 24;
-export const SUPER_COST = 10000;
+export const SUPER_COST = 40000;
 export const TOWER_TYPES: TowerType[] = ['archer', 'warrior', 'mage', 'priest'];
 export const TOWER_LABELS: Record<TowerType, string> = { archer: '궁수', warrior: '전사', mage: '마법사', priest: '사제' };
 export const SUPER_COLORS: Record<TowerType, number> = { archer: 0x70dcff, warrior: 0xffbf65, mage: 0xff735a, priest: 0xc4a0ff };
