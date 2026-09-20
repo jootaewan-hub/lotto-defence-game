@@ -45,6 +45,13 @@ test('each boss tier cycles all four named bosses in ascending difficulty', () =
     [10,'orc-emperor'],[30,'ogre-king'],[50,'ancient-dragon'],[70,'undead-demon-king'],[90,'orc-emperor'],[110,'ogre-king'],
   ]);
 });
+test('a mid boss stage sends four bosses; the other tiers send one', () => {
+  expect(getBossEncounter(5)!.enemyCount).toBe(4);
+  expect(getBossEncounter(15)!.enemyCount).toBe(4);
+  expect(getBossEncounter(10)!.enemyCount).toBe(1);
+  expect(getBossEncounter(20)!.enemyCount).toBe(1);
+  expect(getBossEncounter(120)!.enemyCount).toBe(1);
+});
 test('each boss tier gets its own clear time', () => {
   expect(getBossEncounter(5)!.durationMs).toBe(60_000);
   expect(getBossEncounter(10)!.durationMs).toBe(95_000);

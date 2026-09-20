@@ -692,7 +692,7 @@ describe("lotto defence game systems", () => {
 
     expect(simulation.activeWaveCleanupWindowMs).toBe(20_000);
     expect(simulation.state.waveTimeRemainingMs).toBe(20_000);
-    expect(simulation.enemies).toHaveLength(6);
+    expect(simulation.enemies).toHaveLength(4);
     expect(simulation.enemies.every((enemy) => enemy.isBoss)).toBe(true);
 
     simulation.enemies.splice(0);

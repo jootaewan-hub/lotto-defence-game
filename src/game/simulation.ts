@@ -446,7 +446,9 @@ export class GameSimulation {
     this.state.gold += income;
     this.state.baseHealth = Math.min(this.state.maxBaseHealth, this.state.baseHealth + this.getUpgradeValue('regeneration'));
     this.state = { ...this.state, waveTimeRemainingMs: stage.durationMs, status: "running" };
-    this.combatCounters.remainingSpawns = stage.isTrueBoss || stage.bossId ? 1 : Number.POSITIVE_INFINITY;
+    // A boss stage sends exactly the opponents it declares; ordinary waves keep
+    // spawning for as long as the wave lasts.
+    this.combatCounters.remainingSpawns = stage.isBoss ? stage.enemyCount : Number.POSITIVE_INFINITY;
     this.combatCounters.spawnTimerMs = 0;
     this.currentWaveActive = true;
     this.nextWaveDelayMs = 0;

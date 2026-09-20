@@ -17,6 +17,13 @@ const NAMED_BOSS_DURATION_MS = 95_000;
 const TRUE_BOSS_DURATION_MS = 115_000;
 const FINAL_BOSS_DURATION_MS = 135_000;
 
+/**
+ * How many mid bosses a mid boss stage sends. Named, true and final bosses are
+ * single opponents. This is declared rather than left to fall out of the spawn
+ * interval and the stage length, which is what used to decide it.
+ */
+const MID_BOSS_COUNT = 4;
+
 /** Mid boss health relative to a wave-1 grunt; bosses and true bosses stack on top. */
 const MID_BOSS_BASE_HEALTH = 5.6;
 const MID_BOSS_HEALTH_PER_TIER = 0.95;
@@ -62,7 +69,7 @@ function createStage(number: number, kind: StageKind): WaveDefinition {
     isFinalBoss,
     bossId: kind === "named" ? getNamedBossId(number) : undefined,
     trueBossId: isFinalBoss ? FINAL_BOSS_ID : kind === "true" ? getTrueBossId(number) : undefined,
-    enemyCount: isBoss ? 1 : 10 + tier * 2 + (number % 5),
+    enemyCount: isNamedBoss ? 1 : isBoss ? MID_BOSS_COUNT : 10 + tier * 2 + (number % 5),
     healthMultiplier: baseHealthMultiplier * lateGameHealthMultiplier,
     speedMultiplier: isNamedBoss ? 0.7 + tier * 0.01 : isBoss ? 0.75 + tier * 0.015 : 1 + tier * 0.0175,
     durationMs: isFinalBoss
