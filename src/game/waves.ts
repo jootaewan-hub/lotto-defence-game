@@ -2,7 +2,11 @@ import type { RunState, WaveDefinition } from "./types";
 
 export const MAX_WAVES = 120;
 
-/** Boss cadence: mid boss every 5th wave, named boss every 10th, true boss every 20th, final boss on the last wave. */
+/**
+ * Boss cadence. Bosses are not waves: they are separate stages that follow a
+ * numbered wave without consuming a wave number, so a run is MAX_WAVES ordinary
+ * waves plus the boss stages hanging off every 5th, 10th and 20th of them.
+ */
 const MID_BOSS_EVERY = 5;
 const NAMED_BOSS_EVERY = 10;
 const TRUE_BOSS_EVERY = 20;
@@ -13,7 +17,7 @@ const NAMED_BOSS_DURATION_MS = 95_000;
 const TRUE_BOSS_DURATION_MS = 115_000;
 const FINAL_BOSS_DURATION_MS = 135_000;
 
-/** Mid boss (every 5th wave) health relative to a wave-1 grunt; bosses and true bosses stack on top. */
+/** Mid boss health relative to a wave-1 grunt; bosses and true bosses stack on top. */
 const MID_BOSS_BASE_HEALTH = 5.6;
 const MID_BOSS_HEALTH_PER_TIER = 0.95;
 const BOSS_HEALTH_MULTIPLIER = 1.5;
@@ -36,41 +40,55 @@ export const DIFFICULTIES: Record<RunState['difficulty'], {
   insane: { label: 'Insane', statMultiplier: 3, spawnMultiplier: 2, next: null },
 };
 
-export function buildWaves(): WaveDefinition[] {
-  return Array.from({ length: MAX_WAVES }, (_, index) => {
-    const number = index + 1;
-    const isBoss = number % MID_BOSS_EVERY === 0;
-    const isNamedBoss = number % NAMED_BOSS_EVERY === 0;
-    const isTrueBoss = number % TRUE_BOSS_EVERY === 0;
-    const isFinalBoss = number === MAX_WAVES;
-    const tier = Math.floor((number - 1) / 5);
-    const growthWave = getEnemyGrowthWave(number, isBoss);
-    const healthTier = Math.floor((growthWave - 1) / 5);
-    const lateGameHealthMultiplier = (1 + Math.max(0, growthWave - 20) * 0.0325) * Math.pow(isBoss ? 1.006 : 1.016, growthWave - 1);
-    const midBossHealth = MID_BOSS_BASE_HEALTH + healthTier * MID_BOSS_HEALTH_PER_TIER;
-    const baseHealthMultiplier = isNamedBoss ? midBossHealth * BOSS_HEALTH_MULTIPLIER * (isTrueBoss ? TRUE_BOSS_HEALTH_MULTIPLIER : 1) : isBoss ? midBossHealth : 1 + number * 0.09;
+/** A boss stage carries the number of the wave it follows, so scaling is unchanged. */
+type StageKind = "normal" | "mid" | "named" | "true" | "final";
 
-    return {
-      number,
-      isBoss,
-      isTrueBoss,
-      isFinalBoss,
-      bossId: isNamedBoss && !isTrueBoss ? getNamedBossId(number) : undefined,
-      trueBossId: isFinalBoss ? FINAL_BOSS_ID : isTrueBoss ? getTrueBossId(number) : undefined,
-      enemyCount: isBoss ? 1 : 10 + tier * 2 + (number % 5),
-      healthMultiplier: baseHealthMultiplier * lateGameHealthMultiplier,
-      speedMultiplier: isNamedBoss ? 0.7 + tier * 0.01 : isBoss ? 0.75 + tier * 0.015 : 1 + tier * 0.0175,
-      durationMs: isFinalBoss
-        ? FINAL_BOSS_DURATION_MS
-        : isTrueBoss
-          ? TRUE_BOSS_DURATION_MS
-          : isNamedBoss
-            ? NAMED_BOSS_DURATION_MS
-            : isBoss
-              ? MID_BOSS_DURATION_MS
-              : 28_000 + tier * 2_000,
-    };
-  });
+function createStage(number: number, kind: StageKind): WaveDefinition {
+  const isBoss = kind !== "normal";
+  const isNamedBoss = kind === "named" || kind === "true" || kind === "final";
+  const isTrueBoss = kind === "true" || kind === "final";
+  const isFinalBoss = kind === "final";
+  const tier = Math.floor((number - 1) / 5);
+  const growthWave = getEnemyGrowthWave(number, isBoss);
+  const healthTier = Math.floor((growthWave - 1) / 5);
+  const lateGameHealthMultiplier = (1 + Math.max(0, growthWave - 20) * 0.0325) * Math.pow(isBoss ? 1.006 : 1.016, growthWave - 1);
+  const midBossHealth = MID_BOSS_BASE_HEALTH + healthTier * MID_BOSS_HEALTH_PER_TIER;
+  const baseHealthMultiplier = isNamedBoss ? midBossHealth * BOSS_HEALTH_MULTIPLIER * (isTrueBoss ? TRUE_BOSS_HEALTH_MULTIPLIER : 1) : isBoss ? midBossHealth : 1 + number * 0.09;
+
+  return {
+    number,
+    isBoss,
+    isTrueBoss,
+    isFinalBoss,
+    bossId: kind === "named" ? getNamedBossId(number) : undefined,
+    trueBossId: isFinalBoss ? FINAL_BOSS_ID : kind === "true" ? getTrueBossId(number) : undefined,
+    enemyCount: isBoss ? 1 : 10 + tier * 2 + (number % 5),
+    healthMultiplier: baseHealthMultiplier * lateGameHealthMultiplier,
+    speedMultiplier: isNamedBoss ? 0.7 + tier * 0.01 : isBoss ? 0.75 + tier * 0.015 : 1 + tier * 0.0175,
+    durationMs: isFinalBoss
+      ? FINAL_BOSS_DURATION_MS
+      : isTrueBoss
+        ? TRUE_BOSS_DURATION_MS
+        : isNamedBoss
+          ? NAMED_BOSS_DURATION_MS
+          : isBoss
+            ? MID_BOSS_DURATION_MS
+            : 28_000 + tier * 2_000,
+  };
+}
+
+/** The numbered waves. Every one of them is an ordinary wave. */
+export function buildWaves(): WaveDefinition[] {
+  return Array.from({ length: MAX_WAVES }, (_, index) => createStage(index + 1, "normal"));
+}
+
+/** The boss stage that follows this wave, or null when no boss is due. */
+export function getBossEncounter(afterWave: number): WaveDefinition | null {
+  if (afterWave === MAX_WAVES) return createStage(afterWave, "final");
+  if (afterWave % TRUE_BOSS_EVERY === 0) return createStage(afterWave, "true");
+  if (afterWave % NAMED_BOSS_EVERY === 0) return createStage(afterWave, "named");
+  if (afterWave % MID_BOSS_EVERY === 0) return createStage(afterWave, "mid");
+  return null;
 }
 
 const BOSS_CYCLE = ["orc-emperor", "ogre-king", "ancient-dragon", "undead-demon-king"] as const;

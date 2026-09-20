@@ -6,6 +6,7 @@ import { TOWER_SPAWN, clampTowerPosition } from "./geometry";
 import {
   MAX_WAVES,
   buildWaves,
+  getBossEncounter,
   createInitialRunState,
   createMergeCandidates,
   createRandomRng,
@@ -82,7 +83,7 @@ export type SimulationEvent =
       experienceToNext: number;
       levelsGained: number;
     }
-  | { type: "waveComplete"; wave: number; growthShardsAwarded: number }
+  | { type: "waveComplete"; wave: number; growthShardsAwarded: number; bossLabel?: string }
   | {
       type: "runEnded";
       status: "won" | "lost";
@@ -106,6 +107,10 @@ const EPIC_RARITY_INDEX = getRarityIndex("epic");
 export class GameSimulation {
   get difficulty() { return DIFFICULTIES[this.state.difficulty]; }
   readonly waves = buildWaves();
+  /** The boss stage running right now. Boss stages do not consume a wave number. */
+  private bossStage: WaveDefinition | null = null;
+  /** The boss stage owed by the wave just completed, started by the next startNextWave(). */
+  private queuedBossStage: WaveDefinition | null = null;
   readonly enemies: EnemyState[] = [];
 
   state: RunState;
@@ -385,11 +390,18 @@ export class GameSimulation {
   }
 
   get activeWaveDefinition(): WaveDefinition | null {
-    return this.currentWaveActive ? (this.waves[this.state.wave - 1] ?? null) : null;
+    if (!this.currentWaveActive) return null;
+    return this.bossStage ?? this.waves[this.state.wave - 1] ?? null;
+  }
+
+  /** True while a boss stage is running rather than a numbered wave. */
+  get isBossStageActive(): boolean {
+    return this.currentWaveActive && this.bossStage !== null;
   }
 
   get upcomingWaveDefinition(): WaveDefinition | null {
     if (this.currentWaveActive || this.state.status === 'won' || this.state.status === 'lost') return null;
+    if (this.queuedBossStage) return this.queuedBossStage;
     return this.waves[this.state.wave === MAX_WAVES && this.difficulty.next ? 0 : this.state.wave] ?? null;
   }
 
@@ -401,6 +413,17 @@ export class GameSimulation {
     if (!this.canStartWave) {
       return;
     }
+
+    // A boss owed by the wave just cleared runs as its own stage and leaves the
+    // wave counter alone, so bosses never consume one of the numbered waves.
+    const bossStage = this.queuedBossStage;
+    if (bossStage) {
+      this.queuedBossStage = null;
+      this.bossStage = bossStage;
+      this.beginStage(bossStage, this.state.wave);
+      return;
+    }
+
     if (this.state.wave >= MAX_WAVES && this.difficulty.next) {
       this.state = { ...this.state, difficulty: this.difficulty.next, wave: 0 };
       this.events.push({ type: 'message', text: `${this.difficulty.label} 난이도 진입 · 1웨이브부터 다시 시작합니다.` });
@@ -412,20 +435,30 @@ export class GameSimulation {
       return;
     }
 
+    this.bossStage = null;
+    this.state = { ...this.state, wave: nextWave };
+    this.beginStage(wave, nextWave);
+  }
+
+  private beginStage(stage: WaveDefinition, waveNumber: number): void {
     for(const unit of this.state.board)for(const item of unit.items??[])if(item.kind==='boots')item.waveSpeedPercent=this.randomInteger(5,40);
     const income = this.getUpgradeValue('waveGold') + Math.min(100, Math.floor(this.state.gold * this.bonus('interest')));
     this.state.gold += income;
     this.state.baseHealth = Math.min(this.state.maxBaseHealth, this.state.baseHealth + this.getUpgradeValue('regeneration'));
-    this.state = { ...this.state, wave: nextWave, waveTimeRemainingMs: wave.durationMs, status: "running" };
-    this.combatCounters.remainingSpawns = wave.isTrueBoss || wave.bossId ? 1 : Number.POSITIVE_INFINITY;
+    this.state = { ...this.state, waveTimeRemainingMs: stage.durationMs, status: "running" };
+    this.combatCounters.remainingSpawns = stage.isTrueBoss || stage.bossId ? 1 : Number.POSITIVE_INFINITY;
     this.combatCounters.spawnTimerMs = 0;
     this.currentWaveActive = true;
     this.nextWaveDelayMs = 0;
-    const namedBossId = wave.trueBossId ?? wave.bossId;
+    const namedBossId = stage.trueBossId ?? stage.bossId;
     const trueBossName = namedBossId ? getTrueBossDefinition(namedBossId).label : null;
     this.events.push({
       type: "message",
-      text: trueBossName ? `${wave.isTrueBoss ? '진보스' : '보스'} ${trueBossName} 출현!` : wave.isBoss ? `중간보스 ${nextWave} 웨이브!` : `${nextWave} 웨이브 시작`,
+      text: trueBossName
+        ? `${stage.isFinalBoss ? '최종보스' : stage.isTrueBoss ? '진보스' : '보스'} ${trueBossName} 출현!`
+        : stage.isBoss
+          ? `${waveNumber} 웨이브 후 중간보스 출현!`
+          : `${waveNumber} 웨이브 시작`,
     });
   }
 
@@ -763,19 +796,34 @@ export class GameSimulation {
 
   private completeCurrentWave(): void {
     const completedWave = this.state.wave;
-    const isBoss = completedWave % 5 === 0;
-    const isTrueBoss = completedWave % 10 === 0;
-    const growthShardsAwarded = isTrueBoss ? 6 : isBoss ? 3 : 1;
+    const stage = this.bossStage;
+    // Boss stages pay the boss share; the wave they follow pays the ordinary one.
+    const growthShardsAwarded = stage ? (stage.isTrueBoss || stage.bossId ? 6 : 3) : 1;
     const growthShardsEarned = this.state.growthShardsEarned + growthShardsAwarded;
     this.currentWaveActive = false;
     this.state = { ...this.state, waveTimeRemainingMs: 0, growthShardsEarned };
-    this.events.push({ type: "waveComplete", wave: completedWave, growthShardsAwarded });
+    this.events.push({
+      type: "waveComplete",
+      wave: completedWave,
+      growthShardsAwarded,
+      // A boss stage reports the wave it followed, so the label keeps the two apart.
+      bossLabel: stage ? (stage.isFinalBoss ? "최종보스" : stage.isTrueBoss ? "진보스" : stage.bossId ? "보스" : "중간보스") : undefined,
+    });
 
-    if (completedWave >= MAX_WAVES && !this.difficulty.next) {
-      this.endRun("won");
+    if (stage) {
+      this.bossStage = null;
+      // The run ends on the final boss, not on the last numbered wave.
+      if (stage.isFinalBoss && !this.difficulty.next) {
+        this.endRun("won");
+        return;
+      }
+      this.nextWaveDelayMs = NEXT_WAVE_DELAY_MS;
+      this.rewardChoices = [];
+      this.pendingReward = false;
       return;
     }
 
+    this.queuedBossStage = getBossEncounter(completedWave);
     this.nextWaveDelayMs = NEXT_WAVE_DELAY_MS;
     this.rewardChoices = completedWave % 10 === 0 ? sampleRewards(this.rng, this.upgrades) : [];
     this.pendingReward = this.rewardChoices.length > 0;

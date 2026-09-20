@@ -8,7 +8,7 @@ export { RARITIES, getRarity, getRarityIndex } from "./rarities";
 export { createRandomRng, createSeededRng } from "./rng";
 export { createDefaultMetaProgress, getSkillEffectTotal, purchaseSkill, skillTracks, skillTree } from "./skills";
 export type * from "./types";
-export { MAX_WAVES, buildWaves } from "./waves";
+export { MAX_WAVES, buildWaves, getBossEncounter } from "./waves";
 
 export type SummonKind = "normal" | "advanced" | "legendary";
 

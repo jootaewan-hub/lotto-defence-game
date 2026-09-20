@@ -102,7 +102,9 @@ describe('random blessings and gold forging', () => {
         expect(sim.getUpgradeValue(roll.stat)).toBe(roll.value);
         expect(sim.resolveUpgradeRoll()).toBe(false);
         sim.update(5000);
-        expect(sim.state.wave).toBe(11);
+        // the boss owed by wave 10 runs next, without taking a wave number
+        expect(sim.state.wave).toBe(10);
+        expect(sim.isBossStageActive).toBe(true);
     });
     test('a full board can spend gold repeatedly to increase a selected tower attack', () => {
         const sim = game();

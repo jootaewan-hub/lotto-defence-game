@@ -24,6 +24,19 @@ test('all four campaigns preserve the army, gold and upgrades, and only Insane w
     expect(sim.state.board).toBe(board);
     expect(sim.upgrades.attack).toBe(15);
     expect(sim.state.gold).toBe(gold);
+
+    // Wave 120 is an ordinary wave that offers a blessing; the run is decided by
+    // the final boss stage that follows it, not by the wave itself.
+    expect(sim.state.status).toBe('running');
+    expect(sim.pendingReward).toBe(true);
+    expect(sim.upcomingWaveDefinition?.isFinalBoss).toBe(true);
+    sim.pendingReward = false;
+    sim.rewardChoices = [];
+    sim.update(5000);
+    expect(sim.activeWaveDefinition?.isFinalBoss).toBe(true);
+    expect(sim.state.wave).toBe(120);
+    sim.update(135000);
+
     if (difficulty === 'insane') {
       expect(sim.state.status).toBe('won');
       expect(sim.pendingReward).toBe(false);
@@ -32,12 +45,8 @@ test('all four campaigns preserve the army, gold and upgrades, and only Insane w
       expect(sim.state.wave).toBe(0);
     } else {
       expect(sim.state.status).toBe('running');
-      expect(sim.pendingReward).toBe(true);
       expect(sim.upcomingWaveDefinition?.number).toBe(1);
-      sim.update(5000);
       expect(sim.state.difficulty).toBe(difficulty);
-      sim.rollReward(sim.rewardChoices[0]!.id);
-      sim.resolveUpgradeRoll();
       sim.update(5000);
       expect(sim.state.wave).toBe(1);
       expect(sim.state.difficulty).toBe(difficulties[index + 1]);

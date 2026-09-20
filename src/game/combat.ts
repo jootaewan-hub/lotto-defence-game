@@ -53,7 +53,7 @@ export interface CombatContext {
   readonly enemies: EnemyState[];
   /** 배열 변형만 하며 참조는 고정이다. */
   readonly events: SimulationEvent[];
-  readonly waves: WaveDefinition[];
+  readonly activeWaveDefinition: WaveDefinition | null;
   readonly rng: Rng;
   readonly difficulty: DifficultyConfig;
   readonly currentWaveActive: boolean;
@@ -82,7 +82,7 @@ export function spawnEnemies(ctx: CombatContext, deltaMs: number): void {
     return;
   }
 
-  const wave = ctx.waves[ctx.state.wave - 1]!;
+  const wave = ctx.activeWaveDefinition!;
   const cleanupWindowMs = getWaveCleanupWindowMs(wave);
   const spawnableDeltaMs = Math.min(deltaMs, Math.max(0, ctx.state.waveTimeRemainingMs - cleanupWindowMs));
   if (spawnableDeltaMs <= 0) {

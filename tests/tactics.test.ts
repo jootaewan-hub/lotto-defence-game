@@ -39,7 +39,9 @@ describe('expedition tactics', () => {
         expect(sim.getUpgradeValue(reward.stat)).toBe(roll.value);
         expect(sim.rollReward(reward.id)).toBeNull();
         sim.update(5000);
-        expect(sim.state.wave).toBe(11);
+        // the boss owed by wave 10 runs next, without taking a wave number
+        expect(sim.state.wave).toBe(10);
+        expect(sim.isBossStageActive).toBe(true);
     });
     test('ended runs cannot summon and restart clears expedition bonuses', () => {
         const sim = game();

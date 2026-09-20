@@ -21,6 +21,8 @@ import {
   skillTree,
 } from "../src/game/systems";
 import { GameSimulation, getEnemyExperienceReward } from "../src/game/simulation";
+import { getBossEncounter } from "../src/game/waves";
+import { enterBossStageAfter } from "./bossStage";
 import { TOWER_FIELD, TOWER_RADIUS } from "../src/game/geometry";
 import { loadMetaProgress, saveMetaProgress } from "../src/game/storage";
 import { getUniqueAbilityStats } from "../src/game/uniqueAbilities";
@@ -153,14 +155,17 @@ describe("lotto defence game systems", () => {
     expect(simulation.getMergeableGroups()).toEqual([[0, 1, 2], [3, 4, 5]]);
   });
 
-  test("waves contain 120 rounds with bosses every fifth wave and true bosses every twentieth", () => {
+  test("waves contain 120 ordinary rounds, with bosses as stages that follow every fifth", () => {
     const waves = buildWaves();
 
     expect(waves).toHaveLength(MAX_WAVES);
-    expect(waves.filter((wave) => wave.isBoss).map((wave) => wave.number)).toEqual(
-      Array.from({ length: MAX_WAVES / 5 }, (_, index) => (index + 1) * 5),
-    );
-    expect(waves.filter((wave) => wave.isTrueBoss).map((wave) => [wave.number, wave.trueBossId])).toEqual([
+    expect(waves.some((wave) => wave.isBoss)).toBe(false);
+
+    const bossWaves = Array.from({ length: MAX_WAVES }, (_, i) => i + 1).filter((n) => getBossEncounter(n));
+    expect(bossWaves).toEqual(Array.from({ length: MAX_WAVES / 5 }, (_, index) => (index + 1) * 5));
+
+    const trueBosses = bossWaves.map((n) => getBossEncounter(n)!).filter((b) => b.isTrueBoss);
+    expect(trueBosses.map((b) => [b.number, b.trueBossId])).toEqual([
       [20, "orc-emperor"], [40, "ogre-king"], [60, "ancient-dragon"], [80, "undead-demon-king"],
       [100, "orc-emperor"], [120, "eclipse-sovereign"],
     ]);
@@ -678,9 +683,10 @@ describe("lotto defence game systems", () => {
 
   test("boss waves reserve twenty seconds to defeat the final spawned boss", () => {
     const simulation = new GameSimulation(createDefaultMetaProgress(), createSeededRng(19));
-    simulation.state = { ...simulation.state, wave: 4 };
-    simulation.startNextWave();
-    const bossWave = simulation.waves[4]!;
+    enterBossStageAfter(simulation, 5);
+    const bossWave = simulation.activeWaveDefinition!;
+    expect(simulation.isBossStageActive).toBe(true);
+    expect(simulation.state.wave).toBe(5);
 
     simulation.update(bossWave.durationMs - 20_000);
 
@@ -700,10 +706,8 @@ describe("lotto defence game systems", () => {
 
   test("true boss waves provide one hundred fifteen seconds with a forty-five-second final defeat window", () => {
     const simulation = new GameSimulation(createDefaultMetaProgress(), createSeededRng(19));
-    simulation.state = { ...simulation.state, wave: 19 };
-
-    simulation.startNextWave();
-    const trueBossWave = simulation.waves[19]!;
+    enterBossStageAfter(simulation, 20);
+    const trueBossWave = simulation.activeWaveDefinition!;
 
     expect(trueBossWave.isTrueBoss).toBe(true);
     expect(trueBossWave.durationMs).toBe(115_000);
@@ -725,8 +729,7 @@ describe("lotto defence game systems", () => {
   test("boss waves spawn at one eighth of the previous boss pace", () => {
     const simulation = new GameSimulation(createDefaultMetaProgress(), createSeededRng(19));
 
-    simulation.state = { ...simulation.state, wave: 4 };
-    simulation.startNextWave();
+    enterBossStageAfter(simulation, 5);
     simulation.update(21_700);
 
     expect(simulation.state.wave).toBe(5);
@@ -745,8 +748,7 @@ describe("lotto defence game systems", () => {
     lateSimulation.update(1);
 
     const bossSimulation = new GameSimulation(createDefaultMetaProgress(), createSeededRng(19));
-    bossSimulation.state = { ...bossSimulation.state, wave: 9 };
-    bossSimulation.startNextWave();
+    enterBossStageAfter(bossSimulation, 10);
     bossSimulation.update(1);
 
     const earlyArmor = earlySimulation.enemies[0]!.armor;
@@ -760,8 +762,7 @@ describe("lotto defence game systems", () => {
   test("every twentieth wave spawns a named true boss variant", () => {
     const simulation = new GameSimulation(createDefaultMetaProgress(), createSeededRng(19));
 
-    simulation.state = { ...simulation.state, wave: 19 };
-    simulation.startNextWave();
+    enterBossStageAfter(simulation, 20);
     simulation.update(1);
 
     expect(simulation.enemies[0]).toMatchObject({
@@ -789,27 +790,26 @@ describe("lotto defence game systems", () => {
     expect(stats[2]!.armor).toBeGreaterThan(stats[1]!.armor);
   });
 
-  test("true boss waves spawn only one enemy", () => {
+  test("true boss stages spawn only one enemy", () => {
     const simulation = new GameSimulation(createDefaultMetaProgress(), createSeededRng(19));
 
-    simulation.state = { ...simulation.state, wave: 19 };
-    simulation.startNextWave();
+    enterBossStageAfter(simulation, 20);
     simulation.update(15_000);
 
     expect(simulation.enemies).toHaveLength(1);
     expect(simulation.enemies[0]!.trueBossId).toBe("orc-emperor");
   });
 
-  test("named boss waves carry a boss identity without being true bosses", () => {
+  test("named boss stages carry a boss identity without being true bosses", () => {
     const simulation = new GameSimulation(createDefaultMetaProgress(), createSeededRng(19));
 
-    simulation.state = { ...simulation.state, wave: 29 };
-    simulation.startNextWave();
+    enterBossStageAfter(simulation, 30);
+    const stage = simulation.activeWaveDefinition!;
     simulation.update(15_000);
 
-    expect(simulation.waves[29]!.isTrueBoss).toBe(false);
-    expect(simulation.waves[29]!.bossId).toBe("ogre-king");
-    expect(simulation.waves[29]!.durationMs).toBe(95_000);
+    expect(stage.isTrueBoss).toBe(false);
+    expect(stage.bossId).toBe("ogre-king");
+    expect(stage.durationMs).toBe(95_000);
     expect(simulation.enemies).toHaveLength(1);
     expect(simulation.enemies[0]!.variantLabel).toBe("오우거 대왕");
   });

@@ -56,7 +56,9 @@ test('auto progress resolves a reward once and starts the next wave; pause stays
   sim.update(5000);
   expect(sim.pendingReward).toBe(false);
   expect(sim.rewardHistory).toHaveLength(1);
-  expect(sim.state.wave).toBe(11);
+  // wave 10 owes a boss, and a boss stage does not advance the wave counter
+  expect(sim.state.wave).toBe(10);
+  expect(sim.isBossStageActive).toBe(true);
 });
 test('summons never produce uniques even with large legacy chance bonuses', () => {
   const sim = new GameSimulation(createDefaultMetaProgress(), createSeededRng(7));
@@ -73,7 +75,9 @@ test('retired summon growth refunds once and preserves other progress', () => {
   expect(refundRetiredSkills(refunded)).toEqual(refunded);
 });
 
-import { buildWaves, createInitialRunState, resolveJackpotReward, rollJackpotReward } from '../src/game/systems';
+import { createInitialRunState, resolveJackpotReward, rollJackpotReward } from '../src/game/systems';
+import { getBossEncounter } from '../src/game/waves';
+import { enterBossStageAfter } from './bossStage';
 
 const fixedRng = (value: number) => ({ next: () => value, pick: <T,>(items: T[]) => items[0]! });
 test('jackpot rewards never grant fractional gold or summons', () => {
@@ -84,18 +88,19 @@ test('jackpot rewards never grant fractional gold or summons', () => {
   expect(resolveJackpotReward(state, { type: 'freeSummon', amount: 0.25 }).freeSummons).toBe(state.freeSummons + 1);
 });
 test('boss tiers use the reduced health multipliers', () => {
-  const waves = buildWaves();
+  const boss = (w: number) => getBossEncounter(w)!.healthMultiplier;
   const late = (w: number) => (1 + Math.max(0, w - 20) * 0.0325) * 1.006 ** (w - 1);
-  expect(waves[4]!.healthMultiplier).toBeCloseTo(5.6 * late(5));
-  expect(waves[9]!.healthMultiplier).toBeCloseTo((5.6 + 0.95) * 1.5 * late(10));
-  expect(waves[19]!.healthMultiplier).toBeCloseTo((5.6 + 0.95 * 3) * 1.5 * 1.15 * late(20));
-  expect(waves[29]!.healthMultiplier).toBeCloseTo((5.6 + 0.95 * 5) * 1.5 * late(30));
+  expect(boss(5)).toBeCloseTo(5.6 * late(5));
+  expect(boss(10)).toBeCloseTo((5.6 + 0.95) * 1.5 * late(10));
+  expect(boss(20)).toBeCloseTo((5.6 + 0.95 * 3) * 1.5 * 1.15 * late(20));
+  expect(boss(30)).toBeCloseTo((5.6 + 0.95 * 5) * 1.5 * late(30));
 });
 test('spawned mid boss, boss and true boss health drop on normal difficulty', () => {
   const spawn = (wave: number) => {
     const sim = new GameSimulation(createDefaultMetaProgress(), createSeededRng(1));
-    sim.state.wave = wave - 1; sim.state.baseHealth = sim.state.maxBaseHealth = 1000; sim.state.board = [];
-    sim.startNextWave(); sim.update(1);
+    sim.state.board = [];
+    enterBossStageAfter(sim, wave);
+    sim.update(1);
     return sim.enemies[0]!.maxHp;
   };
   expect(spawn(5)).toBeLessThan(1_650);
