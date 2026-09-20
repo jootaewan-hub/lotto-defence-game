@@ -16,6 +16,7 @@ import {
   getFailureGrowthShards,
   getSkillEffectTotal,
   KEEP_HEALTH_PER_CAMPAIGN,
+  UNIQUES_PER_TOWER_TYPE,
   pickRarity,
   rollSummonUniqueUnit,
   type SummonKind,
@@ -953,7 +954,16 @@ export class GameSimulation {
 
   private canMergeUnit(id: string): boolean {
     const d = getUnitDefinition(id);
-    return !isUniqueUnit(d) && (d.rarity !== 'immortal' || this.state.board.filter(u => Boolean(getUnitDefinition(u.definitionId).uniqueAbility)).length < 2);
+    if (isUniqueUnit(d)) return false;
+    if (d.rarity !== 'immortal') return true;
+    // The cap is per class, because a unique can only ever be fused from, and
+    // spent on, its own class.
+    const type = getTowerType(d);
+    const held = this.state.board.filter(u => {
+      const unit = getUnitDefinition(u.definitionId);
+      return unit.rarity === 'unique' && getTowerType(unit) === type;
+    }).length;
+    return held < UNIQUES_PER_TOWER_TYPE;
   }
 
   private applyMerge(sourceSlots: number[], candidate: UnitDefinition): boolean {

@@ -169,6 +169,13 @@ export function getFailureGrowthShards(wave: number, defeatedEnemies: number, bo
 /** Every tier fuses three of a kind, except immortals, which pair into a unique. */
 export const DEFAULT_MERGE_COUNT = 3;
 export const IMMORTAL_MERGE_COUNT = 2;
+/**
+ * How many uniques a single tower class may hold. The limit used to count every
+ * unique on the board at once, so a guard that had fused two archer uniques
+ * could never make a warrior one however many immortals it stockpiled — and an
+ * awakening needs a unique of its own class.
+ */
+export const UNIQUES_PER_TOWER_TYPE = 2;
 
 export function getMergeRequirement(rarity: RarityId): number {
   return rarity === "immortal" ? IMMORTAL_MERGE_COUNT : DEFAULT_MERGE_COUNT;

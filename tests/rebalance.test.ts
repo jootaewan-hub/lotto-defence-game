@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 import { AUTO_ADVANCED_TOWERS, AUTO_LEGENDARY_TOWERS, chooseAutoSummon, createMergeCandidates, createSeededRng, createDefaultMetaProgress, getRarityIndex, skillTracks } from '../src/game/systems';
 import { getUnitDefinition } from '../src/game/units';
 import { SUPER_COST, SUPER_INGREDIENT_COUNT } from '../src/game/superUnits';
-import { IMMORTAL_MERGE_COUNT, KEEP_HEALTH_PER_CAMPAIGN, MAX_WAVES } from '../src/game/systems';
+import { IMMORTAL_MERGE_COUNT, KEEP_HEALTH_PER_CAMPAIGN, MAX_WAVES, UNIQUES_PER_TOWER_TYPE } from '../src/game/systems';
 import { DIFFICULTIES } from '../src/game/waves';
 import { UNIQUE_UNIT_MAX_LEVEL } from '../src/game/units';
 import { REWARD_POOL } from '../src/game/upgrades';
@@ -135,6 +135,23 @@ test('auto craft banks the fee instead of spending it on summons', () => {
   expect(sim.state.gold).toBe(0);
 });
 
+test('a class at its unique cap does not block a different class', () => {
+  const unit = (definitionId: string, i: number) => (
+    { instanceId: `u${i}`, definitionId, x: 120 + i * 6, y: 148, cooldownMs: 1e9 }
+  ) as any;
+  const sim = new GameSimulation(createDefaultMetaProgress(), createSeededRng(4));
+  sim.state.baseHealth = sim.state.maxBaseHealth = 1e9;
+
+  // an archer class already at its cap must not block a warrior fusion
+  sim.state.board = [
+    ...Array(UNIQUES_PER_TOWER_TYPE).fill('mythic-ranger'),
+    ...Array(IMMORTAL_MERGE_COUNT).fill('immortal-single'),
+  ].map(unit);
+  const warrior = sim.requestMerge(UNIQUES_PER_TOWER_TYPE);
+  expect(warrior?.candidates.map(c => c.id)).toEqual(['immortal-berserker']);
+
+});
+
 test('the campaign wave premium falls on the higher tiers alone', () => {
   const sim = new GameSimulation(createDefaultMetaProgress(), createSeededRng(4));
   const opening = { normal: sim.summonCost, advanced: sim.advancedSummonCost, legendary: sim.legendarySummonCost };
@@ -247,16 +264,18 @@ test('upgrading supports fractional small gains', () => {
 });
 
 const board = (ids: string[]) => ids.map((definitionId, i) => ({definitionId, instanceId: `r${i}`, cooldownMs: 0, x: 120, y: 148}));
-test('unique cap stops manual and bulk fusion without consuming ingredients', () => {
+test('a class at its unique cap stops manual and bulk fusion without consuming ingredients', () => {
   const sim = new GameSimulation(createDefaultMetaProgress(), createSeededRng(2));
-  sim.state.board = board(['mythic-ranger', 'immortal-berserker', ...Array(3).fill('immortal-single')]);
+  const warriorUniques = Array(UNIQUES_PER_TOWER_TYPE).fill('immortal-berserker');
+  sim.state.board = board([...warriorUniques, ...Array(IMMORTAL_MERGE_COUNT + 1).fill('immortal-single')]);
   const before = JSON.stringify(sim.state);
-  expect(sim.requestMerge(2)).toBeNull();
+  expect(sim.requestMerge(UNIQUES_PER_TOWER_TYPE)).toBeNull();
   expect(sim.bulkMergeAll()).toBe(0);
   expect(JSON.stringify(sim.state)).toBe(before);
+  // one sold, one slot under the cap, and the pair fuses
   sim.sellUnit(0);
   expect(sim.bulkMergeAll()).toBe(1);
-  expect(sim.state.board.filter(u => ['mythic-ranger','immortal-berserker','mythic-plague-warlock','transcendent-time-mage','transcendent-frost-witch'].includes(u.definitionId))).toHaveLength(2);
+  expect(sim.state.board.filter(u => getUnitDefinition(u.definitionId).rarity === 'unique')).toHaveLength(UNIQUES_PER_TOWER_TYPE);
 });
 test('stage merge leaves higher and unrelated stages untouched', () => {
   const sim = new GameSimulation(createDefaultMetaProgress(), createSeededRng(2));
