@@ -78,6 +78,17 @@ test('keep durability stays whole even with legacy quarter-value skills', () => 
   }
   expect(createInitialRunState({ ...createDefaultMetaProgress(), unlockedSkills: ['defense-1'] }).maxBaseHealth).toBe(21);
 });
+test('ordinary waves slow down past wave 50 just as bosses do', () => {
+  const waves = buildWaves();
+  const full = (w: number) => (1 + w * 0.09) * (1 + Math.max(0, w - 20) * 0.0325) * 1.016 ** (w - 1);
+  // below the threshold nothing changes
+  expect(waves[44]!.healthMultiplier).toBeCloseTo(full(45));
+  // above it the curve is well under the unslowed one it used to follow
+  expect(waves[79]!.healthMultiplier).toBeLessThan(full(80) * 0.7);
+  expect(waves[119]!.healthMultiplier).toBeLessThan(full(120) * 0.45);
+  // and still rises
+  expect(waves[119]!.healthMultiplier).toBeGreaterThan(waves[79]!.healthMultiplier);
+});
 test('ordinary health compounds at 1.6 percent per wave', () => {
   const waves = buildWaves();
   expect(waves[0]!.healthMultiplier).toBeCloseTo(1.09);

@@ -18,11 +18,12 @@ const TRUE_BOSS_DURATION_MS = 115_000;
 const FINAL_BOSS_DURATION_MS = 135_000;
 
 /**
- * Past wave 50 the mid, named and true boss tiers get longer to clear, matching
- * where boss health and armor already change pace. The final boss is a fixed
- * encounter and keeps its own time.
+ * Where the late game begins. Past this wave growth halves, and the mid, named
+ * and true boss tiers get longer to clear. The final boss is a fixed encounter
+ * and keeps its own time.
  */
-const LATE_BOSS_WAVE = 50;
+const LATE_GAME_WAVE = 50;
+const LATE_GAME_GROWTH_FACTOR = 0.5;
 const LATE_BOSS_DURATION_BONUS_MS = 20_000;
 
 /**
@@ -38,9 +39,16 @@ const MID_BOSS_HEALTH_PER_TIER = 0.95;
 const BOSS_HEALTH_MULTIPLIER = 1.5;
 const TRUE_BOSS_HEALTH_MULTIPLIER = 1.15;
 
-/** After wave 50, boss health and armor advance at half the former pace. */
-export function getEnemyGrowthWave(wave: number, isBoss: boolean): number {
-  return isBoss && wave > 50 ? 50 + (wave - 50) * 0.5 : wave;
+/**
+ * After the late game wave, health and armor advance at half the former pace.
+ *
+ * This used to apply to bosses only, so ordinary waves kept compounding at full
+ * speed while the bosses between them slowed down. Ordinary waves then outgrew
+ * the bosses: by wave 120 a wave carried 28 times its wave-50 health, against
+ * the boss curve's far gentler climb. Both now slow together.
+ */
+export function getEnemyGrowthWave(wave: number): number {
+  return wave > LATE_GAME_WAVE ? LATE_GAME_WAVE + (wave - LATE_GAME_WAVE) * LATE_GAME_GROWTH_FACTOR : wave;
 }
 
 export const DIFFICULTIES: Record<RunState['difficulty'], {
@@ -64,7 +72,7 @@ function createStage(number: number, kind: StageKind): WaveDefinition {
   const isTrueBoss = kind === "true" || kind === "final";
   const isFinalBoss = kind === "final";
   const tier = Math.floor((number - 1) / 5);
-  const growthWave = getEnemyGrowthWave(number, isBoss);
+  const growthWave = getEnemyGrowthWave(number);
   const healthTier = Math.floor((growthWave - 1) / 5);
   const lateGameHealthMultiplier = (1 + Math.max(0, growthWave - 20) * 0.0325) * Math.pow(isBoss ? 1.006 : 1.016, growthWave - 1);
   const midBossHealth = MID_BOSS_BASE_HEALTH + healthTier * MID_BOSS_HEALTH_PER_TIER;
@@ -84,7 +92,7 @@ function createStage(number: number, kind: StageKind): WaveDefinition {
       ? FINAL_BOSS_DURATION_MS
       : isBoss
         ? (isTrueBoss ? TRUE_BOSS_DURATION_MS : isNamedBoss ? NAMED_BOSS_DURATION_MS : MID_BOSS_DURATION_MS)
-          + (number > LATE_BOSS_WAVE ? LATE_BOSS_DURATION_BONUS_MS : 0)
+          + (number > LATE_GAME_WAVE ? LATE_BOSS_DURATION_BONUS_MS : 0)
         : 28_000 + tier * 2_000,
   };
 }

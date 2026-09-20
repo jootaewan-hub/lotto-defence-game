@@ -36,7 +36,7 @@ export function getWaveCleanupWindowMs(wave: WaveDefinition | null | undefined):
 }
 
 export function getWaveArmor(waveNumber: number, isBoss: boolean): number {
-  waveNumber = getEnemyGrowthWave(waveNumber, isBoss);
+  waveNumber = getEnemyGrowthWave(waveNumber);
   const tier = Math.floor((waveNumber - 1) / 5);
   const lateGameArmor = Math.max(0, waveNumber - 30) * 0.6;
   const normalArmor = Math.max(1, Math.floor(waveNumber * 0.4 + tier + lateGameArmor));
