@@ -4,19 +4,21 @@ This project keeps local copies of small fantasy sprite sheets as visual referen
 
 ## OpenGameArt CC0 Sources
 
-- `public/assets/fantasy/mini_fantasy_sprites_oga_ver.png`
+- `docs/asset-reference/mini_fantasy_sprites_oga_ver.png`
   - Source: https://opengameart.org/content/mini-fantasy-sprites
   - Author: GrafxKid
   - License: CC0
   - Used as a visual reference for the fantasy pixel-art direction.
 
-- `public/assets/fantasy/8x8_character_sprite_sheet.png`
+- `docs/asset-reference/8x8_character_sprite_sheet.png`
   - Source: https://opengameart.org/content/8x8-character-and-sprite-sheet
   - Author: Glacialan
   - License: CC0
   - Used as a visual reference for compact undead and skeleton silhouettes.
 
 Credit is not required for CC0, but keeping this file makes the asset lineage clear.
+
+이 참고 자료들은 게임이 불러오지 않으므로 배포 경로(`public/`) 밖에 둔다. 출처와 라이선스 기록은 유지한다.
 
 ## Moonwood environment (2026-09-16)
 
