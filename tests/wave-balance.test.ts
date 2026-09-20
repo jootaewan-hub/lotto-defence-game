@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
 import { buildWaves } from '../src/game/waves';
+import { createDefaultMetaProgress, createInitialRunState } from '../src/game/systems';
 
 test('true bosses appear every twenty waves, with bosses every five', () => {
   const waves = buildWaves();
@@ -30,6 +31,17 @@ test('each boss tier gets its own clear time', () => {
   expect(waves[9]!.durationMs).toBe(95_000);
   expect(waves[19]!.durationMs).toBe(115_000);
   expect(waves[119]!.durationMs).toBe(135_000);
+});
+test('keep durability stays whole even with legacy quarter-value skills', () => {
+  // legacy defence-1 is worth 5, counted at a quarter, which used to show 21.25
+  for (const skills of [['defense-1'], ['defense-1','defense-3'], ['defense-1','defense-3','defense-5'], ['economy-1']]) {
+    const meta = { ...createDefaultMetaProgress(), unlockedSkills: skills };
+    const state = createInitialRunState(meta);
+    expect(Number.isInteger(state.maxBaseHealth)).toBe(true);
+    expect(Number.isInteger(state.baseHealth)).toBe(true);
+    expect(Number.isInteger(state.gold)).toBe(true);
+  }
+  expect(createInitialRunState({ ...createDefaultMetaProgress(), unlockedSkills: ['defense-1'] }).maxBaseHealth).toBe(21);
 });
 test('ordinary health compounds at 1.6 percent per wave', () => {
   const waves = buildWaves();

@@ -62,12 +62,16 @@ const SUMMON_CEILING: Record<SummonKind, RarityId> = {
 export const LEGENDARY_UNIQUE_CHANCE = 0.005;
 
 export function createInitialRunState(meta: MetaProgress = createDefaultMetaProgress()): RunState {
-  const maxBaseHealth = 20 + getSkillEffectTotal(meta, "baseHealthBonus");
+  // Legacy skills count at a quarter of their value, which leaves stats that are
+  // conceptually whole sitting on a fraction: the legacy defence-1 bonus of 5
+  // becomes 1.25 and the keep shows "21.25 / 21.25". Leak damage and regeneration
+  // are already whole, so only these derived starting values need rounding.
+  const maxBaseHealth = Math.round(20 + getSkillEffectTotal(meta, "baseHealthBonus"));
   return {
     difficulty: 'normal',
     wave: 0,
     waveTimeRemainingMs: 0,
-    gold: 100 + getSkillEffectTotal(meta, "startGold"),
+    gold: Math.round(100 + getSkillEffectTotal(meta, "startGold")),
     freeSummons: Math.ceil(getSkillEffectTotal(meta, "startFreeSummons")),
     baseHealth: maxBaseHealth,
     maxBaseHealth,

@@ -1487,8 +1487,14 @@ dialog h2 {
 }
 /* Keep the complete battlefield and its main controls together on desktop. */
 @media(min-width:801px) {
+  /* The field grows with the window but never taller than the viewport. The last
+     term is the height budget: 312px is the masthead, campaign heading and battle
+     HUD stacked above the field plus a gap below, converted to a field width
+     through the 780x500 aspect, then widened by the 310px panel and its 20px gap.
+     Capping the shell rather than the field keeps the panel beside the field
+     instead of leaving dead space next to it on short, wide screens. */
   .shell {
-    width: min(1120px,calc(100% - 48px))
+    width: min(1400px,calc(100% - 48px),calc((100vh - 312px) * 78 / 50 + 330px))
   }
   .masthead {
     height: 78px

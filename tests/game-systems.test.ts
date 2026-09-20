@@ -206,8 +206,9 @@ describe("lotto defence game systems", () => {
     };
     const initialState = createInitialRunState(progressedMeta);
     expect(initialState.freeSummons).toBe(4);
-    expect(initialState.baseHealth).toBe(30.5);
-    expect(initialState.maxBaseHealth).toBe(30.5);
+    // the tree totals 10.5 here; the keep is a whole number, so it rounds to 31
+    expect(initialState.baseHealth).toBe(31);
+    expect(initialState.maxBaseHealth).toBe(31);
   });
 
   test("all twenty skill tiers combine into their documented maximum effects", () => {
