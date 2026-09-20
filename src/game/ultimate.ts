@@ -2,7 +2,7 @@ import type { UnitInstance } from './types';
 
 export const ULTIMATE_ID = 'ultimate-mugeuk';
 /** Twice a super-unique awakening: the last step up should not be the cheap one. */
-export const ULTIMATE_COST = 40000;
+export const ULTIMATE_COST = 60000;
 export const ULTIMATE_REQUIRED = ['super-archer','super-warrior','super-mage','super-priest'] as const;
 export const ULTIMATE_SKILLS = [
     { name: '무극 광폭화', description: '10초 주기, 6초간 자신의 공격력·공격속도 2배.' },
