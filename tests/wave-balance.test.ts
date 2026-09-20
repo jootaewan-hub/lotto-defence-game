@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import { buildWaves, getBossEncounter } from '../src/game/waves';
-import { createDefaultMetaProgress, createInitialRunState } from '../src/game/systems';
+import { BASE_KEEP_HEALTH, createDefaultMetaProgress, createInitialRunState } from '../src/game/systems';
 
 const bossWaves = () => Array.from({ length: 120 }, (_, i) => i + 1).filter(n => getBossEncounter(n));
 
@@ -76,7 +76,7 @@ test('keep durability stays whole even with legacy quarter-value skills', () => 
     expect(Number.isInteger(state.baseHealth)).toBe(true);
     expect(Number.isInteger(state.gold)).toBe(true);
   }
-  expect(createInitialRunState({ ...createDefaultMetaProgress(), unlockedSkills: ['defense-1'] }).maxBaseHealth).toBe(21);
+  expect(createInitialRunState({ ...createDefaultMetaProgress(), unlockedSkills: ['defense-1'] }).maxBaseHealth).toBe(BASE_KEEP_HEALTH + 1);
 });
 test('ordinary waves slow down past wave 50 just as bosses do', () => {
   const waves = buildWaves();

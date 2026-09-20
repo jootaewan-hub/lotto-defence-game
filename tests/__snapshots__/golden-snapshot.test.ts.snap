@@ -3,7 +3,7 @@
 exports[`리팩터링 기준선: 40웨이브 경계 상태와 이벤트 해시 1`] = `
 [
   {
-    "baseHealth": 20,
+    "baseHealth": 50,
     "board": "",
     "completedWave": 0,
     "defeatedEnemies": 0,
@@ -12,7 +12,7 @@ exports[`리팩터링 기준선: 40웨이브 경계 상태와 이벤트 해시 1
     "growthShardsEarned": 0,
   },
   {
-    "baseHealth": 20,
+    "baseHealth": 50,
     "board": "advanced-area,epic-support,rare-area,hero-area,common-single,common-area,common-support,common-single,common-support,rare-archer,epic-area,advanced-archer,hero-area,advanced-area",
     "completedWave": 1,
     "defeatedEnemies": 44,
@@ -21,7 +21,7 @@ exports[`리팩터링 기준선: 40웨이브 경계 상태와 이벤트 해시 1
     "growthShardsEarned": 1,
   },
   {
-    "baseHealth": 20,
+    "baseHealth": 50,
     "board": "rare-support,epic-support,rare-area,hero-area,advanced-support,common-area,rare-archer,epic-area,advanced-archer,hero-area,advanced-single,advanced-archer,common-single,common-archer,rare-support,advanced-support,advanced-area,advanced-single",
     "completedWave": 2,
     "defeatedEnemies": 92,
@@ -30,7 +30,7 @@ exports[`리팩터링 기준선: 40웨이브 경계 상태와 이벤트 해시 1
     "growthShardsEarned": 2,
   },
   {
-    "baseHealth": 20,
+    "baseHealth": 50,
     "board": "hero-area,hero-area,epic-archer,epic-archer,epic-area,epic-area,hero-single,advanced-archer,advanced-archer,advanced-area,advanced-single,advanced-single,common-single,common-support,advanced-area",
     "completedWave": 3,
     "defeatedEnemies": 144,
@@ -39,7 +39,7 @@ exports[`리팩터링 기준선: 40웨이브 경계 상태와 이벤트 해시 1
     "growthShardsEarned": 3,
   },
   {
-    "baseHealth": 20,
+    "baseHealth": 50,
     "board": "hero-area,hero-area,epic-archer,epic-archer,epic-area,epic-area,hero-single,rare-area,rare-single,rare-support,common-support,rare-archer,common-area,advanced-archer,rare-single,common-area,common-single,rare-archer,epic-single,advanced-single,common-archer,rare-support",
     "completedWave": 4,
     "defeatedEnemies": 200,
@@ -48,7 +48,7 @@ exports[`리팩터링 기준선: 40웨이브 경계 상태와 이벤트 해시 1
     "growthShardsEarned": 4,
   },
   {
-    "baseHealth": 20,
+    "baseHealth": 50,
     "board": "legendary-support,hero-single,hero-single,hero-support,rare-support,epic-single,advanced-single,common-archer,rare-support,advanced-area,epic-area,hero-archer,common-single,advanced-area",
     "completedWave": 5,
     "defeatedEnemies": 244,
@@ -57,7 +57,7 @@ exports[`리팩터링 기준선: 40웨이브 경계 상태와 이벤트 해시 1
     "growthShardsEarned": 8,
   },
   {
-    "baseHealth": 20,
+    "baseHealth": 50,
     "board": "legendary-support,hero-single,hero-single,hero-support,epic-archer,epic-single,advanced-single,common-archer,rare-support,epic-area,hero-archer,common-area,advanced-archer,advanced-support,rare-single,advanced-single,epic-single,rare-archer,common-support",
     "completedWave": 6,
     "defeatedEnemies": 297,
@@ -66,7 +66,7 @@ exports[`리팩터링 기준선: 40웨이브 경계 상태와 이벤트 해시 1
     "growthShardsEarned": 9,
   },
   {
-    "baseHealth": 20,
+    "baseHealth": 50,
     "board": "legendary-support,hero-single,hero-single,hero-support,epic-archer,epic-single,advanced-single,advanced-area,rare-support,epic-area,hero-archer,advanced-archer,advanced-archer,advanced-support,rare-single,advanced-single,epic-single,rare-archer,common-support,advanced-area,rare-area,common-archer,common-single,common-single,common-area,common-area",
     "completedWave": 7,
     "defeatedEnemies": 354,
@@ -75,7 +75,7 @@ exports[`리팩터링 기준선: 40웨이브 경계 상태와 이벤트 해시 1
     "growthShardsEarned": 10,
   },
   {
-    "baseHealth": 20,
+    "baseHealth": 50,
     "board": "legendary-support,hero-single,hero-single,hero-support,epic-archer,epic-single,rare-single,rare-area,rare-support,epic-area,hero-archer,epic-support,rare-support,rare-single,epic-single,advanced-support,rare-area,common-archer,epic-support,advanced-support,advanced-area,hero-support,common-archer",
     "completedWave": 8,
     "defeatedEnemies": 415,
@@ -84,7 +84,7 @@ exports[`리팩터링 기준선: 40웨이브 경계 상태와 이벤트 해시 1
     "growthShardsEarned": 11,
   },
   {
-    "baseHealth": 20,
+    "baseHealth": 50,
     "board": "legendary-support,hero-single,hero-single,hero-support,epic-archer,legendary-single,rare-single,epic-single,epic-area,rare-single,advanced-support,advanced-archer,advanced-support,advanced-area,hero-support,advanced-area,epic-single,rare-archer,common-archer,epic-area,rare-area,epic-support,advanced-archer",
     "completedWave": 9,
     "defeatedEnemies": 480,
@@ -93,7 +93,7 @@ exports[`리팩터링 기준선: 40웨이브 경계 상태와 이벤트 해시 1
     "growthShardsEarned": 12,
   },
   {
-    "baseHealth": 20,
+    "baseHealth": 50,
     "board": "legendary-support,legendary-single,hero-support,hero-area,legendary-single,epic-single,epic-area,rare-single,advanced-archer,rare-single,hero-support,epic-single,rare-archer,common-archer,epic-area,rare-area,epic-support,advanced-archer,common-archer,common-area,rare-archer,advanced-single,rare-area,common-single,advanced-single,common-single,common-support,common-support",
     "completedWave": 10,
     "defeatedEnemies": 530,
@@ -102,7 +102,7 @@ exports[`리팩터링 기준선: 40웨이브 경계 상태와 이벤트 해시 1
     "growthShardsEarned": 19,
   },
   {
-    "baseHealth": 20,
+    "baseHealth": 50,
     "board": "legendary-support,legendary-single,hero-support,hero-area,legendary-single,hero-archer,hero-single,hero-support,rare-archer,epic-archer,epic-support,common-area,advanced-archer,rare-archer,epic-single,rare-area,common-area,rare-single",
     "completedWave": 11,
     "defeatedEnemies": 591,
@@ -111,7 +111,7 @@ exports[`리팩터링 기준선: 40웨이브 경계 상태와 이벤트 해시 1
     "growthShardsEarned": 20,
   },
   {
-    "baseHealth": 20,
+    "baseHealth": 50,
     "board": "legendary-support,legendary-single,hero-support,hero-area,legendary-single,hero-archer,hero-single,hero-support,epic-area,epic-archer,epic-support,epic-single,rare-support,epic-single,rare-single,advanced-support,common-area,epic-support,advanced-area,common-archer,rare-archer,common-support,advanced-single",
     "completedWave": 12,
     "defeatedEnemies": 656,
@@ -120,7 +120,7 @@ exports[`리팩터링 기준선: 40웨이브 경계 상태와 이벤트 해시 1
     "growthShardsEarned": 21,
   },
   {
-    "baseHealth": 20,
+    "baseHealth": 50,
     "board": "legendary-support,legendary-single,hero-support,hero-area,legendary-single,hero-archer,hero-single,hero-support,epic-area,epic-archer,hero-archer,hero-area,epic-support,rare-area,rare-archer,common-support,advanced-single,advanced-archer,epic-archer,rare-area,common-single,advanced-area,epic-area,advanced-archer,common-support",
     "completedWave": 13,
     "defeatedEnemies": 725,
@@ -129,7 +129,7 @@ exports[`리팩터링 기준선: 40웨이브 경계 상태와 이벤트 해시 1
     "growthShardsEarned": 22,
   },
   {
-    "baseHealth": 20,
+    "baseHealth": 50,
     "board": "legendary-support,legendary-single,legendary-support,hero-area,legendary-single,hero-archer,hero-single,epic-area,epic-archer,hero-archer,hero-area,epic-support,epic-support,rare-archer,rare-support,epic-archer,advanced-support,advanced-area,epic-area,rare-single,common-area,epic-single,common-archer,advanced-support,common-single,common-area,common-archer,hero-support",
     "completedWave": 14,
     "defeatedEnemies": 798,
@@ -138,7 +138,7 @@ exports[`리팩터링 기준선: 40웨이브 경계 상태와 이벤트 해시 1
     "growthShardsEarned": 23,
   },
   {
-    "baseHealth": 20,
+    "baseHealth": 50,
     "board": "legendary-support,mythic-archer,legendary-support,legendary-single,hero-single,hero-single,hero-archer,rare-archer,rare-area,epic-archer,epic-single,advanced-support,hero-support,advanced-single,epic-area,advanced-archer,rare-archer,advanced-support,advanced-area,rare-single,common-area,rare-support,advanced-area,epic-archer,common-archer,rare-area,common-single",
     "completedWave": 15,
     "defeatedEnemies": 859,
@@ -147,7 +147,7 @@ exports[`리팩터링 기준선: 40웨이브 경계 상태와 이벤트 해시 1
     "growthShardsEarned": 27,
   },
   {
-    "baseHealth": 20,
+    "baseHealth": 50,
     "board": "legendary-support,mythic-archer,legendary-support,legendary-single,hero-single,hero-single,hero-archer,epic-single,rare-area,hero-area,epic-single,rare-archer,hero-support,epic-archer,epic-area,advanced-archer,rare-archer,common-area,rare-support,rare-area,advanced-archer,advanced-area,advanced-area,rare-support,common-single,advanced-support",
     "completedWave": 16,
     "defeatedEnemies": 929,
@@ -156,7 +156,7 @@ exports[`리팩터링 기준선: 40웨이브 경계 상태와 이벤트 해시 1
     "growthShardsEarned": 28,
   },
   {
-    "baseHealth": 20,
+    "baseHealth": 50,
     "board": "legendary-support,mythic-archer,legendary-support,legendary-single,hero-single,hero-single,hero-archer,hero-support,epic-area,hero-area,rare-archer,hero-support,hero-area,epic-area,rare-single,rare-archer,common-area,advanced-support,advanced-support,rare-single,rare-area,common-archer,epic-support,common-area,advanced-area,advanced-single,common-support",
     "completedWave": 17,
     "defeatedEnemies": 1003,
@@ -165,7 +165,7 @@ exports[`리팩터링 기준선: 40웨이브 경계 상태와 이벤트 해시 1
     "growthShardsEarned": 29,
   },
   {
-    "baseHealth": 20,
+    "baseHealth": 50,
     "board": "legendary-support,mythic-archer,legendary-support,legendary-single,legendary-archer,hero-archer,hero-support,hero-area,hero-support,hero-area,hero-single,advanced-area,advanced-archer,advanced-area,advanced-single,common-support,epic-archer,epic-area,epic-single,common-support,advanced-archer,advanced-support,common-single,common-archer,rare-area",
     "completedWave": 18,
     "defeatedEnemies": 1081,
@@ -174,7 +174,7 @@ exports[`리팩터링 기준선: 40웨이브 경계 상태와 이벤트 해시 1
     "growthShardsEarned": 30,
   },
   {
-    "baseHealth": 20,
+    "baseHealth": 50,
     "board": "legendary-support,mythic-archer,legendary-support,legendary-single,legendary-archer,hero-archer,hero-support,hero-area,hero-support,hero-area,hero-single,rare-archer,rare-single,advanced-single,epic-archer,epic-area,epic-single,advanced-support,common-single,common-archer,epic-single,common-support,advanced-area,rare-area,epic-archer,common-single,epic-area,hero-single,common-archer,advanced-single,common-support,advanced-area",
     "completedWave": 19,
     "defeatedEnemies": 1163,
@@ -183,7 +183,7 @@ exports[`리팩터링 기준선: 40웨이브 경계 상태와 이벤트 해시 1
     "growthShardsEarned": 31,
   },
   {
-    "baseHealth": 20,
+    "baseHealth": 50,
     "board": "legendary-support,mythic-archer,legendary-support,legendary-single,legendary-archer,hero-archer,hero-support,hero-area,hero-support,hero-area,legendary-area,hero-archer,epic-archer,advanced-single,epic-single,common-single,epic-single,common-single,advanced-single,epic-support,epic-support,common-support,hero-single,rare-area",
     "completedWave": 20,
     "defeatedEnemies": 1230,
@@ -192,7 +192,7 @@ exports[`리팩터링 기준선: 40웨이브 경계 상태와 이벤트 해시 1
     "growthShardsEarned": 38,
   },
   {
-    "baseHealth": 20,
+    "baseHealth": 50,
     "board": "legendary-support,mythic-archer,legendary-support,legendary-single,legendary-archer,hero-archer,hero-support,hero-area,hero-support,hero-area,legendary-area,hero-archer,epic-archer,epic-archer,epic-single,epic-single,hero-single,advanced-area,hero-single,rare-archer,advanced-support,rare-single,advanced-area,advanced-support,rare-archer,common-area,common-area,advanced-archer,common-support,common-support,common-single,common-single",
     "completedWave": 21,
     "defeatedEnemies": 1309,
@@ -201,7 +201,7 @@ exports[`리팩터링 기준선: 40웨이브 경계 상태와 이벤트 해시 1
     "growthShardsEarned": 39,
   },
   {
-    "baseHealth": 20,
+    "baseHealth": 50,
     "board": "mythic-area,mythic-archer,legendary-single,legendary-archer,legendary-area,legendary-single,legendary-area,hero-single,hero-single,epic-support,advanced-support,advanced-archer,advanced-single,advanced-support,rare-single,advanced-archer,common-area,common-single,advanced-single,epic-archer,common-support,epic-archer,common-single",
     "completedWave": 22,
     "defeatedEnemies": 1392,
@@ -210,7 +210,7 @@ exports[`리팩터링 기준선: 40웨이브 경계 상태와 이벤트 해시 1
     "growthShardsEarned": 40,
   },
   {
-    "baseHealth": 20,
+    "baseHealth": 50,
     "board": "mythic-area,mythic-archer,legendary-single,legendary-archer,legendary-area,legendary-single,legendary-area,hero-single,hero-single,epic-support,epic-support,hero-archer,advanced-archer,common-single,epic-archer,epic-archer,common-single,advanced-support,common-area,common-support,advanced-support,rare-single",
     "completedWave": 23,
     "defeatedEnemies": 1479,
@@ -219,7 +219,7 @@ exports[`리팩터링 기준선: 40웨이브 경계 상태와 이벤트 해시 1
     "growthShardsEarned": 41,
   },
   {
-    "baseHealth": 20,
+    "baseHealth": 50,
     "board": "mythic-area,mythic-archer,legendary-single,legendary-archer,legendary-area,legendary-single,legendary-area,legendary-archer,epic-support,epic-support,hero-archer,rare-archer,epic-single,advanced-single,advanced-archer,rare-single,hero-archer,advanced-single,rare-support,epic-single,common-archer,common-archer,common-area,common-single,advanced-support",
     "completedWave": 24,
     "defeatedEnemies": 1571,
@@ -228,7 +228,7 @@ exports[`리팩터링 기준선: 40웨이브 경계 상태와 이벤트 해시 1
     "growthShardsEarned": 42,
   },
   {
-    "baseHealth": 20,
+    "baseHealth": 50,
     "board": "mythic-area,mythic-archer,mythic-area,legendary-archer,legendary-area,legendary-area,legendary-archer,epic-support,epic-support,hero-single,epic-single,rare-single,advanced-area,advanced-area,rare-area,epic-single,advanced-archer,advanced-support,advanced-support,common-area,rare-single,common-single,common-archer",
     "completedWave": 25,
     "defeatedEnemies": 1650,
@@ -237,7 +237,7 @@ exports[`리팩터링 기준선: 40웨이브 경계 상태와 이벤트 해시 1
     "growthShardsEarned": 46,
   },
   {
-    "baseHealth": 20,
+    "baseHealth": 50,
     "board": "mythic-area,mythic-archer,mythic-area,legendary-archer,legendary-area,legendary-area,legendary-archer,legendary-support,epic-area,rare-area,rare-area,common-single,advanced-single,hero-area,advanced-single,rare-single,common-support,common-area",
     "completedWave": 26,
     "defeatedEnemies": 1738,
@@ -246,7 +246,7 @@ exports[`리팩터링 기준선: 40웨이브 경계 상태와 이벤트 해시 1
     "growthShardsEarned": 47,
   },
   {
-    "baseHealth": 20,
+    "baseHealth": 50,
     "board": "mythic-area,mythic-archer,mythic-area,legendary-archer,legendary-area,legendary-area,legendary-archer,legendary-support,epic-area,rare-area,rare-area,rare-archer,epic-archer,hero-area,rare-single,epic-single,hero-single,advanced-archer,advanced-support,common-archer,rare-support,rare-single,advanced-support,epic-area,common-support",
     "completedWave": 27,
     "defeatedEnemies": 1830,
@@ -255,7 +255,7 @@ exports[`리팩터링 기준선: 40웨이브 경계 상태와 이벤트 해시 1
     "growthShardsEarned": 48,
   },
   {
-    "baseHealth": 20,
+    "baseHealth": 50,
     "board": "mythic-area,mythic-archer,mythic-area,legendary-archer,legendary-area,legendary-area,legendary-archer,legendary-support,hero-area,hero-support,rare-archer,epic-archer,hero-area,hero-single,epic-area,common-archer,epic-area,advanced-support,epic-archer,rare-single,common-support,common-support,common-archer,common-area",
     "completedWave": 28,
     "defeatedEnemies": 1926,
@@ -264,7 +264,7 @@ exports[`리팩터링 기준선: 40웨이브 경계 상태와 이벤트 해시 1
     "growthShardsEarned": 49,
   },
   {
-    "baseHealth": 20,
+    "baseHealth": 50,
     "board": "mythic-area,mythic-archer,mythic-area,legendary-archer,legendary-area,legendary-area,legendary-archer,legendary-support,hero-area,hero-support,rare-archer,hero-single,hero-area,hero-single,epic-area,advanced-support,epic-area,advanced-support,advanced-archer,common-area,advanced-archer,rare-support,epic-archer,common-area,epic-support,common-archer,rare-support,common-single,hero-support,common-archer",
     "completedWave": 29,
     "defeatedEnemies": 2027,
@@ -273,7 +273,7 @@ exports[`리팩터링 기준선: 40웨이브 경계 상태와 이벤트 해시 1
     "growthShardsEarned": 50,
   },
   {
-    "baseHealth": 20,
+    "baseHealth": 50,
     "board": "transcendent-area,mythic-archer,legendary-archer,legendary-area,legendary-area,legendary-archer,hero-area,hero-area,hero-archer,rare-single,rare-area,epic-archer,advanced-single,advanced-single,rare-area,common-area,common-support",
     "completedWave": 30,
     "defeatedEnemies": 2112,
@@ -282,7 +282,7 @@ exports[`리팩터링 기준선: 40웨이브 경계 상태와 이벤트 해시 1
     "growthShardsEarned": 57,
   },
   {
-    "baseHealth": 20,
+    "baseHealth": 50,
     "board": "transcendent-area,mythic-archer,legendary-archer,legendary-area,legendary-area,legendary-archer,hero-area,hero-area,hero-archer,epic-archer,epic-area,epic-archer,advanced-area,rare-support,rare-support,common-single,advanced-area,common-archer,epic-support,common-archer,common-support,advanced-support,rare-area",
     "completedWave": 31,
     "defeatedEnemies": 2209,
@@ -291,7 +291,7 @@ exports[`리팩터링 기준선: 40웨이브 경계 상태와 이벤트 해시 1
     "growthShardsEarned": 58,
   },
   {
-    "baseHealth": 20,
+    "baseHealth": 50,
     "board": "transcendent-area,mythic-archer,legendary-archer,legendary-area,legendary-area,legendary-archer,hero-area,hero-area,legendary-single,epic-archer,epic-archer,rare-area,rare-single,advanced-archer,epic-support,advanced-archer,advanced-support,epic-support,common-single,rare-archer,common-single,common-area,hero-support,rare-archer,common-support,advanced-single,rare-support",
     "completedWave": 32,
     "defeatedEnemies": 2310,
@@ -300,7 +300,7 @@ exports[`리팩터링 기준선: 40웨이브 경계 상태와 이벤트 해시 1
     "growthShardsEarned": 59,
   },
   {
-    "baseHealth": 20,
+    "baseHealth": 50,
     "board": "transcendent-area,mythic-archer,legendary-archer,legendary-area,legendary-area,legendary-archer,hero-area,hero-area,legendary-single,hero-single,rare-area,epic-single,rare-support,epic-support,advanced-support,epic-support,advanced-area,rare-archer,advanced-archer,hero-support,rare-archer,advanced-single,advanced-single,rare-support,advanced-area,common-archer,epic-area,advanced-archer,rare-area,advanced-support,common-single,common-single,common-support,rare-single",
     "completedWave": 33,
     "defeatedEnemies": 2416,
@@ -309,7 +309,7 @@ exports[`리팩터링 기준선: 40웨이브 경계 상태와 이벤트 해시 1
     "growthShardsEarned": 60,
   },
   {
-    "baseHealth": 20,
+    "baseHealth": 50,
     "board": "transcendent-area,mythic-archer,legendary-archer,legendary-area,legendary-area,legendary-archer,hero-area,hero-area,legendary-single,legendary-support,epic-archer,rare-support,hero-support,rare-single,common-archer,epic-area,advanced-support,rare-single,common-area,rare-support,epic-area,rare-area,common-archer,epic-single,common-area,advanced-support,advanced-single,rare-area",
     "completedWave": 34,
     "defeatedEnemies": 2526,
@@ -318,7 +318,7 @@ exports[`리팩터링 기준선: 40웨이브 경계 상태와 이벤트 해시 1
     "growthShardsEarned": 61,
   },
   {
-    "baseHealth": 20,
+    "baseHealth": 50,
     "board": "transcendent-area,mythic-archer,legendary-archer,mythic-support,legendary-archer,legendary-single,legendary-support,epic-archer,epic-single,hero-support,rare-single,advanced-area,epic-area,rare-single,advanced-support,epic-area,epic-support,epic-single,epic-archer,hero-archer,advanced-archer,advanced-archer,rare-archer,hero-support,rare-support,common-single,common-single,hero-area,advanced-area,common-archer,rare-archer",
     "completedWave": 35,
     "defeatedEnemies": 2623,
@@ -327,7 +327,7 @@ exports[`리팩터링 기준선: 40웨이브 경계 상태와 이벤트 해시 1
     "growthShardsEarned": 65,
   },
   {
-    "baseHealth": 20,
+    "baseHealth": 50,
     "board": "transcendent-area,mythic-archer,legendary-archer,mythic-support,legendary-archer,legendary-single,legendary-support,hero-support,epic-single,legendary-support,hero-support,rare-area,advanced-support,epic-support,epic-single,hero-archer,rare-single,advanced-area,hero-area,epic-area,common-area,epic-area,epic-support,common-area,common-single",
     "completedWave": 36,
     "defeatedEnemies": 2729,
@@ -336,7 +336,7 @@ exports[`리팩터링 기준선: 40웨이브 경계 상태와 이벤트 해시 1
     "growthShardsEarned": 66,
   },
   {
-    "baseHealth": 20,
+    "baseHealth": 50,
     "board": "transcendent-area,mythic-archer,legendary-archer,mythic-support,legendary-archer,legendary-single,mythic-support,epic-single,rare-area,advanced-support,epic-support,epic-single,hero-archer,rare-single,rare-archer,hero-area,epic-support,advanced-single,epic-archer,common-archer,rare-single,epic-archer,advanced-archer,common-archer,rare-archer,common-area,rare-support,common-support,common-support,rare-support,advanced-area",
     "completedWave": 37,
     "defeatedEnemies": 2840,
@@ -345,7 +345,7 @@ exports[`리팩터링 기준선: 40웨이브 경계 상태와 이벤트 해시 1
     "growthShardsEarned": 67,
   },
   {
-    "baseHealth": 20,
+    "baseHealth": 50,
     "board": "transcendent-area,mythic-archer,legendary-archer,mythic-support,legendary-archer,legendary-single,mythic-support,legendary-area,rare-area,rare-support,legendary-support,rare-single,rare-archer,rare-area,epic-archer,hero-single,rare-single,epic-archer,rare-archer,common-support,common-support,advanced-area,common-single,epic-support,hero-support,hero-support,advanced-area,common-single,hero-single",
     "completedWave": 38,
     "defeatedEnemies": 2955,
@@ -354,7 +354,7 @@ exports[`리팩터링 기준선: 40웨이브 경계 상태와 이벤트 해시 1
     "growthShardsEarned": 68,
   },
   {
-    "baseHealth": 20,
+    "baseHealth": 50,
     "board": "transcendent-area,mythic-archer,legendary-archer,mythic-support,legendary-archer,legendary-single,mythic-support,legendary-area,epic-support,legendary-area,legendary-support,epic-single,epic-single,legendary-support,advanced-single,epic-support,advanced-single,epic-area,epic-archer,rare-support,hero-archer,common-single,hero-single,common-area",
     "completedWave": 39,
     "defeatedEnemies": 3074,
@@ -363,7 +363,7 @@ exports[`리팩터링 기준선: 40웨이브 경계 상태와 이벤트 해시 1
     "growthShardsEarned": 69,
   },
   {
-    "baseHealth": 20,
+    "baseHealth": 50,
     "board": "transcendent-area,mythic-archer,legendary-archer,mythic-support,legendary-archer,legendary-single,mythic-support,legendary-area,epic-support,legendary-area,legendary-support,hero-support,legendary-support,hero-area,epic-support,hero-archer,epic-archer,hero-archer,rare-single,hero-single,advanced-support,advanced-area,advanced-area,hero-support,common-area,rare-single,advanced-support,epic-area",
     "completedWave": 40,
     "defeatedEnemies": 3177,

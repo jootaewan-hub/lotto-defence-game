@@ -2,7 +2,7 @@ import { MAX_TOWERS } from '../src/game/superUnits';
 import { REWARD_POOL } from '../src/game/upgrades';
 import { describe, expect, test } from 'vitest';
 import { GameSimulation } from '../src/game/simulation';
-import { createDefaultMetaProgress, createSeededRng } from '../src/game/systems';
+import { BASE_KEEP_HEALTH, createDefaultMetaProgress, createSeededRng } from '../src/game/systems';
 const game = () => new GameSimulation(createDefaultMetaProgress(), createSeededRng(27));
 describe('expedition tactics', () => {
     test('a mixed formation activates the combined-arms bonus', () => {
@@ -80,12 +80,12 @@ describe('expedition tactics', () => {
     test('max-health rewards raise both health values and cannot be taken twice', () => {
         const sim = game();
         sim.pendingReward = true;
-        sim.state.baseHealth = 19;
+        sim.state.baseHealth = BASE_KEEP_HEALTH - 1;
         sim.rewardChoices = [REWARD_POOL.find(r => r.id === 'maxHealth')!];
         const roll = sim.rollReward('maxHealth')!;
         expect(sim.resolveUpgradeRoll()).toBe(true);
-        expect(sim.state.baseHealth).toBe(19 + roll.value);
-        expect(sim.state.maxBaseHealth).toBe(20 + roll.value);
+        expect(sim.state.baseHealth).toBe(BASE_KEEP_HEALTH - 1 + roll.value);
+        expect(sim.state.maxBaseHealth).toBe(BASE_KEEP_HEALTH + roll.value);
         expect(sim.rollReward('maxHealth')).toBeNull();
         expect(sim.expeditionAttackBonus).toBe(0);
     });

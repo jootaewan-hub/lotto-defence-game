@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 import {
+  BASE_KEEP_HEALTH,
   LEGENDARY_UNIQUE_CHANCE,
   MAX_WAVES,
   RARITIES,
@@ -65,7 +66,7 @@ describe("lotto defence game systems", () => {
     expect(simulation.state).toMatchObject({
       wave: 0,
       gold: 100,
-      baseHealth: 20,
+      baseHealth: BASE_KEEP_HEALTH,
       status: "ready",
       board: [],
     });
@@ -274,9 +275,9 @@ describe("lotto defence game systems", () => {
     };
     const initialState = createInitialRunState(progressedMeta);
     expect(initialState.freeSummons).toBe(4);
-    // the tree totals 10.5 here; the keep is a whole number, so it rounds to 31
-    expect(initialState.baseHealth).toBe(31);
-    expect(initialState.maxBaseHealth).toBe(31);
+    // the tree totals 10.5 here; the keep is a whole number, so it rounds up by 11
+    expect(initialState.baseHealth).toBe(BASE_KEEP_HEALTH + 11);
+    expect(initialState.maxBaseHealth).toBe(BASE_KEEP_HEALTH + 11);
   });
 
   test("all twenty skill tiers combine into their documented maximum effects", () => {

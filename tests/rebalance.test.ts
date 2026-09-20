@@ -2,7 +2,8 @@ import { expect, test } from 'vitest';
 import { AUTO_ADVANCED_TOWERS, AUTO_LEGENDARY_TOWERS, chooseAutoSummon, createMergeCandidates, createSeededRng, createDefaultMetaProgress, getRarityIndex, skillTracks } from '../src/game/systems';
 import { getUnitDefinition } from '../src/game/units';
 import { SUPER_COST, SUPER_INGREDIENT_COUNT } from '../src/game/superUnits';
-import { IMMORTAL_MERGE_COUNT } from '../src/game/systems';
+import { IMMORTAL_MERGE_COUNT, KEEP_HEALTH_PER_CAMPAIGN, MAX_WAVES } from '../src/game/systems';
+import { DIFFICULTIES } from '../src/game/waves';
 import { UNIQUE_UNIT_MAX_LEVEL } from '../src/game/units';
 import { REWARD_POOL } from '../src/game/upgrades';
 import { GameSimulation } from '../src/game/simulation';
@@ -132,6 +133,36 @@ test('auto craft banks the fee instead of spending it on summons', () => {
   for (let t = 0; t < 2000; t += 100) sim.update(100);
   expect(sim.state.board.some(u => u.definitionId === 'super-warrior')).toBe(true);
   expect(sim.state.gold).toBe(0);
+});
+
+test('the campaign wave premium falls on the higher tiers alone', () => {
+  const sim = new GameSimulation(createDefaultMetaProgress(), createSeededRng(4));
+  const opening = { normal: sim.summonCost, advanced: sim.advancedSummonCost, legendary: sim.legendarySummonCost };
+  expect(opening).toEqual({ normal: 10, advanced: 50, legendary: 100 });
+
+  // deep into a later campaign, with no summon bought yet so only the wave moved
+  sim.state = { ...sim.state, difficulty: 'nightmare', wave: 60 };
+  expect(sim.summonCost).toBe(opening.normal);
+  expect(sim.advancedSummonCost).toBeGreaterThan(opening.advanced * 5);
+  expect(sim.legendarySummonCost / sim.advancedSummonCost).toBe(opening.legendary / opening.advanced);
+});
+
+test('clearing a campaign heals the keep and leaves it sturdier', () => {
+  const sim = new GameSimulation(createDefaultMetaProgress(), createSeededRng(4));
+  const before = sim.state.maxBaseHealth;
+  sim.state = { ...sim.state, wave: MAX_WAVES, baseHealth: 1 };
+  sim.startNextWave();
+
+  expect(sim.state.difficulty).toBe('nightmare');
+  expect(sim.state.maxBaseHealth).toBe(before + KEEP_HEALTH_PER_CAMPAIGN);
+  expect(sim.state.baseHealth).toBe(sim.state.maxBaseHealth);
+});
+
+test('each difficulty pays double the one before it', () => {
+  expect(DIFFICULTIES.normal.goldMultiplier).toBe(1);
+  expect(DIFFICULTIES.nightmare.goldMultiplier).toBe(2);
+  expect(DIFFICULTIES.hell.goldMultiplier).toBe(4);
+  expect(DIFFICULTIES.insane.goldMultiplier).toBe(8);
 });
 
 test('auto craft holds feeders back only once the unique is in hand', () => {

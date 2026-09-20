@@ -95,12 +95,20 @@ export function chooseAutoSummon(
 /** Only the legendary summon can produce a unique, and only this often. */
 export const LEGENDARY_UNIQUE_CHANCE = 0.002;
 
+/**
+ * What the keep starts with, and what surviving a full campaign of 120 waves
+ * adds to it. A campaign is the game's one long checkpoint, so clearing one
+ * both heals the keep and leaves it permanently sturdier for the next.
+ */
+export const BASE_KEEP_HEALTH = 50;
+export const KEEP_HEALTH_PER_CAMPAIGN = 50;
+
 export function createInitialRunState(meta: MetaProgress = createDefaultMetaProgress()): RunState {
   // Legacy skills count at a quarter of their value, which leaves stats that are
   // conceptually whole sitting on a fraction: the legacy defence-1 bonus of 5
   // becomes 1.25 and the keep shows "21.25 / 21.25". Leak damage and regeneration
   // are already whole, so only these derived starting values need rounding.
-  const maxBaseHealth = Math.round(20 + getSkillEffectTotal(meta, "baseHealthBonus"));
+  const maxBaseHealth = Math.round(BASE_KEEP_HEALTH + getSkillEffectTotal(meta, "baseHealthBonus"));
   return {
     difficulty: 'normal',
     wave: 0,

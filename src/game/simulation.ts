@@ -15,6 +15,7 @@ import {
   createRandomRng,
   getFailureGrowthShards,
   getSkillEffectTotal,
+  KEEP_HEALTH_PER_CAMPAIGN,
   pickRarity,
   rollSummonUniqueUnit,
   type SummonKind,
@@ -103,6 +104,8 @@ const ADVANCED_SUMMON_COST_MULTIPLIER = 5;
  * of it. Their opening price is untouched.
  */
 const HIGH_TIER_PRESSURE_SHARE = 2 / 3;
+/** What each campaign wave adds to the higher tiers' price, as a share of it. */
+const HIGH_TIER_WAVE_PREMIUM = 0.04;
 /**
  * Two advanced summons. At three it could not be worth more per gold than an
  * advanced summon without handing out immortals at a rate that would trivialise
@@ -411,12 +414,19 @@ export class GameSimulation {
 
   /**
    * `pressureShare` is how much of the run's accumulated price climb this tier
-   * takes. The opening price is always the full multiple of the base.
+   * takes, and `wavePremium` how much the campaign's progress adds on top. The
+   * opening price is always the full multiple of the base.
+   *
+   * The count of summons already bought works out to a square root of the gold
+   * earned, so on its own it falls behind the wave curve and the top tier ends
+   * up bought in unbounded quantity late on. Only the higher tiers pay the wave
+   * premium; a guardian summon stays the cheap staple it has always been.
    */
-  private summonPriceOf(multiplier: number, pressureShare: number): number {
+  private summonPriceOf(multiplier: number, pressureShare: number, wavePremium = 0): number {
     const discount = Math.min(0.5, getSkillEffectTotal(this.meta, "summonDiscount") + this.bonus("summonDiscount"));
     const summonPressure = Math.floor(this.successfulSummons / SUMMONS_PER_COST_INCREASE);
-    const price = (BASE_SUMMON_COST + summonPressure * pressureShare) * multiplier;
+    const campaignWave = this.difficulty.waveOffset + this.state.wave;
+    const price = (BASE_SUMMON_COST + summonPressure * pressureShare) * multiplier * (1 + campaignWave * wavePremium);
     return Math.max(1, Math.round(price * (1 - discount)));
   }
 
@@ -425,11 +435,11 @@ export class GameSimulation {
   }
 
   get legendarySummonCost(): number {
-    return this.summonPriceOf(ADVANCED_SUMMON_COST_MULTIPLIER * LEGENDARY_SUMMON_COST_RATIO, HIGH_TIER_PRESSURE_SHARE);
+    return this.summonPriceOf(ADVANCED_SUMMON_COST_MULTIPLIER * LEGENDARY_SUMMON_COST_RATIO, HIGH_TIER_PRESSURE_SHARE, HIGH_TIER_WAVE_PREMIUM);
   }
 
   get advancedSummonCost(): number {
-    return this.summonPriceOf(ADVANCED_SUMMON_COST_MULTIPLIER, HIGH_TIER_PRESSURE_SHARE);
+    return this.summonPriceOf(ADVANCED_SUMMON_COST_MULTIPLIER, HIGH_TIER_PRESSURE_SHARE, HIGH_TIER_WAVE_PREMIUM);
   }
 
   get canStartWave(): boolean {
@@ -485,8 +495,9 @@ export class GameSimulation {
     }
 
     if (this.state.wave >= MAX_WAVES && this.difficulty.next) {
-      this.state = { ...this.state, difficulty: this.difficulty.next, wave: 0 };
-      this.events.push({ type: 'message', text: `${this.difficulty.label} 난이도 진입 · 1웨이브부터 다시 시작합니다.` });
+      const maxBaseHealth = this.state.maxBaseHealth + KEEP_HEALTH_PER_CAMPAIGN;
+      this.state = { ...this.state, difficulty: this.difficulty.next, wave: 0, maxBaseHealth, baseHealth: maxBaseHealth };
+      this.events.push({ type: 'message', text: `${this.difficulty.label} 난이도 진입 · 1웨이브부터 다시 시작합니다. 성채 내구도 회복 · 최대 +${KEEP_HEALTH_PER_CAMPAIGN}` });
     }
     const nextWave = this.state.wave + 1;
     const wave = this.waves[nextWave - 1];

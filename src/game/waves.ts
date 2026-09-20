@@ -70,7 +70,11 @@ const DIFFICULTY_SPEED_STEP = 1.15;
 /** Armor takes half the difficulty's increase: it multiplies damage down, so the
  *  full step stacked with the health curve left late Insane at a 91% cut. */
 const DIFFICULTY_ARMOR_SHARE = 0.5;
-/** Killing is far harder past 보통, so a kill there is worth more. */
+/**
+ * Compounded per difficulty, so a kill is worth what it costs to make: 보통 1x,
+ * 나이트메어 2x, 헬 4x, Insane 8x. A flat step past 보통 left the later
+ * difficulties paying the same as the first one they had to survive.
+ */
 const DIFFICULTY_GOLD_STEP = 2;
 
 const difficultyStats = (rank: number) => {
@@ -79,7 +83,7 @@ const difficultyStats = (rank: number) => {
     waveOffset: DIFFICULTY_WAVE_OFFSET * rank,
     statMultiplier,
     armorMultiplier: Number((1 + (statMultiplier - 1) * DIFFICULTY_ARMOR_SHARE).toFixed(4)),
-    goldMultiplier: rank === 0 ? 1 : DIFFICULTY_GOLD_STEP,
+    goldMultiplier: Math.pow(DIFFICULTY_GOLD_STEP, rank),
     speedMultiplier: Number(Math.pow(DIFFICULTY_SPEED_STEP, rank).toFixed(4)),
   };
 };
