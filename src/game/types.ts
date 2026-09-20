@@ -50,6 +50,8 @@ export interface UnitDefinition {
 
 export interface WaveDefinition {
   number: number;
+  /** The wave whose curve health and armor read, which continues across difficulties. */
+  scalingWave: number;
   enemyCount: number;
   healthMultiplier: number;
   speedMultiplier: number;

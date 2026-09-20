@@ -112,7 +112,21 @@ const EPIC_RARITY_INDEX = getRarityIndex("epic");
 
 export class GameSimulation {
   get difficulty() { return DIFFICULTIES[this.state.difficulty]; }
-  readonly waves = buildWaves();
+  private waveCacheOffset = -1;
+  private waveCache: WaveDefinition[] = [];
+  /**
+   * Derived from the current difficulty rather than built once, because each
+   * difficulty reads a different stretch of the curve. A stored array would go
+   * stale the moment anything set state.difficulty without rebuilding it.
+   */
+  get waves(): WaveDefinition[] {
+    const offset = this.difficulty.waveOffset;
+    if (offset !== this.waveCacheOffset) {
+      this.waveCacheOffset = offset;
+      this.waveCache = buildWaves(offset);
+    }
+    return this.waveCache;
+  }
   /** The boss stage running right now. Boss stages do not consume a wave number. */
   private bossStage: WaveDefinition | null = null;
   /** The boss stage owed by the wave just completed, started by the next startNextWave(). */
@@ -935,7 +949,7 @@ export class GameSimulation {
       return;
     }
 
-    this.queuedBossStage = getBossEncounter(completedWave);
+    this.queuedBossStage = getBossEncounter(completedWave, this.difficulty.waveOffset);
     this.nextWaveDelayMs = NEXT_WAVE_DELAY_MS;
     this.rewardChoices = completedWave % 10 === 0 ? sampleRewards(this.rng, this.upgrades) : [];
     this.pendingReward = this.rewardChoices.length > 0;

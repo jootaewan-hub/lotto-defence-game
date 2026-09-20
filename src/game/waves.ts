@@ -51,35 +51,63 @@ export function getEnemyGrowthWave(wave: number): number {
   return wave > LATE_GAME_WAVE ? LATE_GAME_WAVE + (wave - LATE_GAME_WAVE) * LATE_GAME_GROWTH_FACTOR : wave;
 }
 
+/**
+ * A campaign used to restart its health curve from wave 1, so clearing 보통's
+ * last wave and stepping up dropped the enemy to about a eightieth of what had
+ * just been beaten. Each difficulty now continues the curve where the previous
+ * one ended, by offsetting the wave its health and armor scale from, and adds
+ * half again on top. Its first wave is therefore about 1.5x the last wave of
+ * the difficulty before it.
+ *
+ * Movement speed does not follow the offset. The curve would make Insane
+ * enemies lap the route in under a second, which no tower can answer, so speed
+ * takes a gentler step per difficulty.
+ */
+export const DIFFICULTY_WAVE_OFFSET = MAX_WAVES;
+const DIFFICULTY_STAT_STEP = 1.5;
+const DIFFICULTY_SPEED_STEP = 1.15;
+
+const difficultyStats = (rank: number) => ({
+  waveOffset: DIFFICULTY_WAVE_OFFSET * rank,
+  statMultiplier: Number(Math.pow(DIFFICULTY_STAT_STEP, rank).toFixed(4)),
+  speedMultiplier: Number(Math.pow(DIFFICULTY_SPEED_STEP, rank).toFixed(4)),
+});
+
 export const DIFFICULTIES: Record<RunState['difficulty'], {
   label: string;
+  waveOffset: number;
   statMultiplier: number;
+  speedMultiplier: number;
   spawnMultiplier: number;
   next: RunState['difficulty'] | null;
 }> = {
-  normal: { label: '보통', statMultiplier: 1, spawnMultiplier: 1, next: 'nightmare' },
-  nightmare: { label: '나이트메어', statMultiplier: 1.5, spawnMultiplier: 1, next: 'hell' },
-  hell: { label: '헬', statMultiplier: 2, spawnMultiplier: 1, next: 'insane' },
-  insane: { label: 'Insane', statMultiplier: 3, spawnMultiplier: 2, next: null },
+  normal: { label: '보통', ...difficultyStats(0), spawnMultiplier: 1, next: 'nightmare' },
+  nightmare: { label: '나이트메어', ...difficultyStats(1), spawnMultiplier: 1, next: 'hell' },
+  hell: { label: '헬', ...difficultyStats(2), spawnMultiplier: 1, next: 'insane' },
+  insane: { label: 'Insane', ...difficultyStats(3), spawnMultiplier: 2, next: null },
 };
 
 /** A boss stage carries the number of the wave it follows, so scaling is unchanged. */
 type StageKind = "normal" | "mid" | "named" | "true" | "final";
 
-function createStage(number: number, kind: StageKind): WaveDefinition {
+function createStage(number: number, kind: StageKind, waveOffset = 0): WaveDefinition {
   const isBoss = kind !== "normal";
   const isNamedBoss = kind === "named" || kind === "true" || kind === "final";
   const isTrueBoss = kind === "true" || kind === "final";
   const isFinalBoss = kind === "final";
+  // Health and armor scale from the continued wave; count, speed and clear time
+  // stay tied to the wave's own number so a campaign still reads 1 to 120.
+  const scalingWave = number + waveOffset;
   const tier = Math.floor((number - 1) / 5);
-  const growthWave = getEnemyGrowthWave(number);
+  const growthWave = getEnemyGrowthWave(scalingWave);
   const healthTier = Math.floor((growthWave - 1) / 5);
   const lateGameHealthMultiplier = (1 + Math.max(0, growthWave - 20) * 0.0325) * Math.pow(isBoss ? 1.006 : 1.016, growthWave - 1);
   const midBossHealth = MID_BOSS_BASE_HEALTH + healthTier * MID_BOSS_HEALTH_PER_TIER;
-  const baseHealthMultiplier = isNamedBoss ? midBossHealth * BOSS_HEALTH_MULTIPLIER * (isTrueBoss ? TRUE_BOSS_HEALTH_MULTIPLIER : 1) : isBoss ? midBossHealth : 1 + number * 0.09;
+  const baseHealthMultiplier = isNamedBoss ? midBossHealth * BOSS_HEALTH_MULTIPLIER * (isTrueBoss ? TRUE_BOSS_HEALTH_MULTIPLIER : 1) : isBoss ? midBossHealth : 1 + scalingWave * 0.09;
 
   return {
     number,
+    scalingWave,
     isBoss,
     isTrueBoss,
     isFinalBoss,
@@ -98,16 +126,16 @@ function createStage(number: number, kind: StageKind): WaveDefinition {
 }
 
 /** The numbered waves. Every one of them is an ordinary wave. */
-export function buildWaves(): WaveDefinition[] {
-  return Array.from({ length: MAX_WAVES }, (_, index) => createStage(index + 1, "normal"));
+export function buildWaves(waveOffset = 0): WaveDefinition[] {
+  return Array.from({ length: MAX_WAVES }, (_, index) => createStage(index + 1, "normal", waveOffset));
 }
 
 /** The boss stage that follows this wave, or null when no boss is due. */
-export function getBossEncounter(afterWave: number): WaveDefinition | null {
-  if (afterWave === MAX_WAVES) return createStage(afterWave, "final");
-  if (afterWave % TRUE_BOSS_EVERY === 0) return createStage(afterWave, "true");
-  if (afterWave % NAMED_BOSS_EVERY === 0) return createStage(afterWave, "named");
-  if (afterWave % MID_BOSS_EVERY === 0) return createStage(afterWave, "mid");
+export function getBossEncounter(afterWave: number, waveOffset = 0): WaveDefinition | null {
+  if (afterWave === MAX_WAVES) return createStage(afterWave, "final", waveOffset);
+  if (afterWave % TRUE_BOSS_EVERY === 0) return createStage(afterWave, "true", waveOffset);
+  if (afterWave % NAMED_BOSS_EVERY === 0) return createStage(afterWave, "named", waveOffset);
+  if (afterWave % MID_BOSS_EVERY === 0) return createStage(afterWave, "mid", waveOffset);
   return null;
 }
 

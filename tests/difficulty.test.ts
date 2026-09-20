@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import { GameSimulation } from '../src/game/simulation';
-import { createDefaultMetaProgress, createSeededRng } from '../src/game/systems';
+import { createDefaultMetaProgress, createSeededRng, MAX_WAVES } from '../src/game/systems';
 import { getItemUpgradeChance } from '../src/game/superUnits';
 import { dragonShopMarkup } from '../src/superUi';
 
@@ -56,23 +56,53 @@ test('all four campaigns preserve the army, gold and upgrades, and only Insane w
   }
 });
 
-test.each([1, 5, 10, 120])('difficulty scales actual spawned enemies for wave %s', wave => {
-  const snapshots = ['normal', 'nightmare', 'hell', 'insane'].map(difficulty => {
-    const sim = game();
-    sim.state.difficulty = difficulty as typeof sim.state.difficulty;
-    sim.state.wave = wave - 1;
-    sim.startNextWave();
-    sim.update(10000);
-    return sim.enemies;
-  });
-  const normal = snapshots[0]!;
-  for (const [index, multiplier] of [1, 1.5, 2, 3].entries()) {
-    const enemies = snapshots[index]!;
-    expect(enemies).toHaveLength(normal.length * (index === 3 ? 2 : 1));
-    expect(enemies[0]!.maxHp).toBe(Math.round(normal[0]!.maxHp * multiplier));
-    expect(enemies[0]!.armor).toBe(Math.round(normal[0]!.armor * multiplier));
+const DIFFICULTIES_IN_ORDER = ['normal', 'nightmare', 'hell', 'insane'] as const;
+const spawnAt = (difficulty: typeof DIFFICULTIES_IN_ORDER[number], wave: number) => {
+  const sim = game();
+  sim.state.difficulty = difficulty;
+  sim.state.wave = wave - 1;
+  sim.startNextWave();
+  sim.update(10000);
+  return sim.enemies;
+};
+
+test.each([1, 5, 10, 120])('each difficulty is strictly harder than the last at wave %s', wave => {
+  const snapshots = DIFFICULTIES_IN_ORDER.map(d => spawnAt(d, wave));
+  for (const [index, enemies] of snapshots.entries()) {
     expect(new Set(enemies.map(e => e.id)).size).toBe(enemies.length);
+    // only Insane doubles the batch
+    expect(enemies).toHaveLength(snapshots[0]!.length * (index === 3 ? 2 : 1));
+    if (index === 0) continue;
+    expect(enemies[0]!.maxHp).toBeGreaterThan(snapshots[index - 1]![0]!.maxHp);
+    expect(enemies[0]!.armor).toBeGreaterThan(snapshots[index - 1]![0]!.armor);
+    expect(enemies[0]!.speed).toBeGreaterThan(snapshots[index - 1]![0]!.speed);
   }
+});
+
+test('a campaign picks up where the last one ended, half again as hard', () => {
+  // Measured on the curve, not on a spawned enemy: wave 1 rolls a grunt variant
+  // and wave 120 rolls a tier-five one, so spawned health compares two things.
+  const curve = (difficulty: typeof DIFFICULTIES_IN_ORDER[number], wave: number) => {
+    const sim = game();
+    sim.state.difficulty = difficulty;
+    return sim.waves[wave - 1]!.healthMultiplier * sim.difficulty.statMultiplier;
+  };
+
+  for (let i = 1; i < DIFFICULTIES_IN_ORDER.length; i += 1) {
+    const previousLast = curve(DIFFICULTIES_IN_ORDER[i - 1]!, MAX_WAVES);
+    const firstWave = curve(DIFFICULTIES_IN_ORDER[i]!, 1);
+    expect(firstWave / previousLast).toBeGreaterThan(1.45);
+    expect(firstWave / previousLast).toBeLessThan(1.6);
+  }
+});
+
+test('movement speed steps gently so late enemies stay answerable', () => {
+  const speeds = DIFFICULTIES_IN_ORDER.map(d => spawnAt(d, 1)[0]!.speed);
+  for (let i = 1; i < speeds.length; i += 1) {
+    expect(speeds[i]! / speeds[i - 1]!).toBeCloseTo(1.15, 2);
+  }
+  // the whole ladder stays well under double, unlike the health curve
+  expect(speeds[3]! / speeds[0]!).toBeLessThan(2);
 });
 
 test('dragon enhancement probabilities cover every level through 24', () => {
