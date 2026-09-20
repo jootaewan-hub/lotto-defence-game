@@ -10,6 +10,9 @@ export const RARITIES: Rarity[] = [
   { id: "mythic", label: "신화", summonChance: 0.01, color: "#38bdf8", powerMultiplier: 7.25 },
   { id: "transcendent", label: "초월", summonChance: 0.007, color: "#c084fc", powerMultiplier: 9.8 },
   { id: "immortal", label: "불멸", summonChance: 0.003, color: "#f43f5e", powerMultiplier: 13 },
+  // The tier above immortal. It has no generic units and is never summoned by
+  // rarity: the five unique-ability guardians are its only members.
+  { id: "unique", label: "유니크", summonChance: 0, color: "#f0abfc", powerMultiplier: 17 },
 ];
 
 export function getRarityIndex(rarity: RarityId): number {

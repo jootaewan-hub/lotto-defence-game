@@ -7,6 +7,7 @@ import {
   MAX_WAVES,
   buildWaves,
   getBossEncounter,
+  getMergeRequirementFor,
   createInitialRunState,
   createMergeCandidates,
   createRandomRng,
@@ -598,15 +599,17 @@ export class GameSimulation {
 
   requestMerge(slot?: number): MergePrompt | null {
     if (this.pendingRoll || this.pendingReward) return null;
-    const targetSlot = slot ?? this.state.board.findIndex((entry, index) => entry && this.findMatchingSlots(index).length >= 3);
+    const targetSlot = slot ?? this.state.board.findIndex((entry, index) =>
+      entry && this.findMatchingSlots(index).length >= getMergeRequirementFor(entry.definitionId));
     if (targetSlot < 0 || !this.state.board[targetSlot]) {
-      this.events.push({ type: "message", text: "합성할 유닛 3개가 필요해요." });
+      this.events.push({ type: "message", text: "합성할 유닛이 부족해요." });
       return null;
     }
 
+    const required = getMergeRequirementFor(this.state.board[targetSlot]!.definitionId);
     const matchingSlots = this.findMatchingSlots(targetSlot);
-    if (matchingSlots.length < 3) {
-      this.events.push({ type: "message", text: "같은 유닛 3개가 필요해요." });
+    if (matchingSlots.length < required) {
+      this.events.push({ type: "message", text: `같은 유닛 ${required}개가 필요해요.` });
       return null;
     }
 
@@ -614,7 +617,7 @@ export class GameSimulation {
     if (!this.canMergeUnit(source.definitionId)) return null;
     try {
       this.pendingMerge = {
-        sourceSlots: [targetSlot, ...matchingSlots.filter((matchingSlot) => matchingSlot !== targetSlot)].slice(0, 3),
+        sourceSlots: [targetSlot, ...matchingSlots.filter((matchingSlot) => matchingSlot !== targetSlot)].slice(0, required),
         candidates: createMergeCandidates(source.definitionId, this.rng),
       };
       return this.pendingMerge;
@@ -664,7 +667,7 @@ export class GameSimulation {
     this.pendingMerge = null;
     this.events.push({
       type: "message",
-      text: mergedCount > 0 ? `일괄합성 ${mergedCount}회 완료!` : "합성할 유닛 3개가 필요해요.",
+      text: mergedCount > 0 ? `일괄합성 ${mergedCount}회 완료!` : "합성할 유닛이 부족해요.",
     });
     return mergedCount;
   }
@@ -691,11 +694,12 @@ export class GameSimulation {
     });
 
     for (const [definitionId, slots] of slotsByDefinition) {
-      if (slots.length < 3 || !this.canMergeUnit(definitionId)) {
+      const required = getMergeRequirementFor(definitionId);
+      if (slots.length < required || !this.canMergeUnit(definitionId)) {
         continue;
       }
-      for (let index = 0; index + 2 < slots.length; index += 3) {
-        groups.push(slots.slice(index, index + 3));
+      for (let index = 0; index + required <= slots.length; index += required) {
+        groups.push(slots.slice(index, index + required));
       }
     }
 
@@ -863,13 +867,14 @@ export class GameSimulation {
     });
 
     for (const [definitionId, slots] of slotsByDefinition) {
-      if (slots.length < 3 || (rarity && getUnitDefinition(definitionId).rarity !== rarity) || !this.canMergeUnit(definitionId)) {
+      const required = getMergeRequirementFor(definitionId);
+      if (slots.length < required || (rarity && getUnitDefinition(definitionId).rarity !== rarity) || !this.canMergeUnit(definitionId)) {
         continue;
       }
 
       try {
         return {
-          sourceSlots: slots.slice(0, 3),
+          sourceSlots: slots.slice(0, required),
           candidates: createMergeCandidates(definitionId, this.rng),
         };
       } catch {

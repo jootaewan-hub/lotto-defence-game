@@ -7,7 +7,8 @@ export type RarityId =
   | "legendary"
   | "mythic"
   | "transcendent"
-  | "immortal";
+  | "immortal"
+  | "unique";
 
 export type UnitRole = "single" | "area" | "support";
 export type TowerType = 'archer' | 'warrior' | 'mage' | 'priest';

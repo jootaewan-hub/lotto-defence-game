@@ -4,8 +4,11 @@ import { getUnitDefinition, getUnitPortrait } from '../src/game/units';
 import { getEvolutionVisual } from '../src/game/evolutionVisuals';
 import { evolutionGalleryMarkup, unitArtMarkup } from '../src/evolutionUi';
 
+// Unique is the tenth rarity but has no generic units, so it is not a rung on
+// the evolution ladder the gallery draws.
+const LADDER = RARITIES.filter(r => r.id !== 'unique');
 test.each([1, 40, 100, 200])('all nine evolution sizes remain distinct with %s towers', count => {
-  const profiles = RARITIES.map(r => getEvolutionVisual(getUnitDefinition(`${r.id}-single`), 1, count));
+  const profiles = LADDER.map(r => getEvolutionVisual(getUnitDefinition(`${r.id}-single`), 1, count));
   expect(profiles.map(p => p.stage)).toEqual([1,2,3,4,5,6,7,8,9]);
   profiles.slice(1).forEach((p, i) => expect(p.size).toBeGreaterThan(profiles[i]!.size));
   expect(profiles[8]!.ornaments).toBeGreaterThan(profiles[0]!.ornaments);

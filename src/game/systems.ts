@@ -124,13 +124,27 @@ export function getFailureGrowthShards(wave: number, defeatedEnemies: number, bo
   return Math.max(3, Math.round((waveReward + killReward) * (1 + Math.max(0, bonus))));
 }
 
+/** Every tier fuses three of a kind, except immortals, which pair into a unique. */
+export const DEFAULT_MERGE_COUNT = 3;
+export const IMMORTAL_MERGE_COUNT = 2;
+
+export function getMergeRequirement(rarity: RarityId): number {
+  return rarity === "immortal" ? IMMORTAL_MERGE_COUNT : DEFAULT_MERGE_COUNT;
+}
+
+export function getMergeRequirementFor(unitId: string): number {
+  return getMergeRequirement(getUnitDefinition(unitId).rarity);
+}
+
 export function createMergeCandidates(sourceUnitId: string, rng: Rng): UnitDefinition[] {
   const source = getUnitDefinition(sourceUnitId);
   const sourceIndex = getRarityIndex(source.rarity);
   const nextRarity = RARITIES[sourceIndex + 1];
 
   if (isUniqueUnit(source)) throw new Error("유니크는 일반 합성할 수 없습니다.");
-  const candidates = nextRarity ? getUnitsByRarity(nextRarity.id).filter(u => !isUniqueUnit(u)) : UNIT_DEFINITIONS.filter(u => u.uniqueAbility && !u.superUnique);
+  // Unique is a real rarity now, so merging three immortals reaches it the same
+  // way every other tier is reached, with no special case at the top.
+  const candidates = nextRarity ? getUnitsByRarity(nextRarity.id) : [];
   for (let index = candidates.length - 1; index > 0; index -= 1) {
     const swapIndex = Math.floor(rng.next() * (index + 1));
     [candidates[index], candidates[swapIndex]] = [candidates[swapIndex]!, candidates[index]!];

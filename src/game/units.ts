@@ -38,18 +38,19 @@ const roleBlueprints: Record<
 const roleOrder: UnitRole[] = ["single", "area", "support"];
 export const UNIQUE_UNIT_MAX_LEVEL = 999;
 
-export const UNIT_DEFINITIONS: UnitDefinition[] = RARITIES.flatMap((rarity) =>
+// The unique tier has no generic units; its members are the hand-built five below.
+export const UNIT_DEFINITIONS: UnitDefinition[] = RARITIES.filter((rarity) => rarity.id !== "unique").flatMap((rarity) =>
   [...roleOrder.map((role) => createUnit(rarity.id, role)), { ...createUnit(rarity.id, "single"), id: `${rarity.id}-archer`, name: `${rarity.label} 궁수`, towerType: "archer" as const, attackType: "관통 화살", range: 154, skill: "먼 거리의 선두 적에게 집중 사격" }],
 ).concat([
   {
     id: "mythic-ranger",
     name: "유니크 폭풍궁수",
-    rarity: "mythic",
+    rarity: "unique",
     role: "single",
     uniqueAbility: "multishot",
     attackType: "연속 사격",
-    attack: 82,
-    attackSpeed: 560,
+    attack: 250,
+    attackSpeed: 215,
     criticalChance: 0.24,
     range: 154,
     skill: "최대 5명의 적을 공격하며 5레벨마다 연사 위력 상승",
@@ -57,12 +58,12 @@ export const UNIT_DEFINITIONS: UnitDefinition[] = RARITIES.flatMap((rarity) =>
   {
     id: "mythic-plague-warlock",
     name: "유니크 역병술사",
-    rarity: "mythic",
+    rarity: "unique",
     role: "area",
     uniqueAbility: "poison",
     attackType: "독성 저주",
-    attack: 48,
-    attackSpeed: 760,
+    attack: 205,
+    attackSpeed: 225,
     criticalChance: 0.16,
     range: 136,
     skill: "방어 무시 독 피해, 5레벨마다 피해와 지속시간 상승",
@@ -70,12 +71,12 @@ export const UNIT_DEFINITIONS: UnitDefinition[] = RARITIES.flatMap((rarity) =>
   {
     id: "transcendent-time-mage",
     name: "유니크 시간마도사",
-    rarity: "transcendent",
+    rarity: "unique",
     role: "support",
     uniqueAbility: "slow",
     attackType: "시간 왜곡",
-    attack: 54,
-    attackSpeed: 840,
+    attack: 140,
+    attackSpeed: 270,
     criticalChance: 0.18,
     range: 160,
     skill: "5레벨마다 둔화율과 지속시간 상승",
@@ -83,12 +84,12 @@ export const UNIT_DEFINITIONS: UnitDefinition[] = RARITIES.flatMap((rarity) =>
   {
     id: "transcendent-frost-witch",
     name: "유니크 서리마녀",
-    rarity: "transcendent",
+    rarity: "unique",
     role: "area",
     uniqueAbility: "freeze",
     attackType: "빙결 파편",
-    attack: 64,
-    attackSpeed: 1040,
+    attack: 195,
+    attackSpeed: 235,
     criticalChance: 0.18,
     range: 142,
     skill: "5레벨마다 빙결 확률과 지속시간 상승",
@@ -96,12 +97,12 @@ export const UNIT_DEFINITIONS: UnitDefinition[] = RARITIES.flatMap((rarity) =>
   {
     id: "immortal-berserker",
     name: "유니크 광전사",
-    rarity: "immortal",
+    rarity: "unique",
     role: "single",
     uniqueAbility: "berserk",
     attackType: "광폭 참격",
-    attack: 145,
-    attackSpeed: 740,
+    attack: 340,
+    attackSpeed: 210,
     criticalChance: 0.28,
     range: 128,
     skill: "5레벨마다 광폭 피해, 공격속도, 지속시간 상승",

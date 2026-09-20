@@ -12,6 +12,8 @@ import {
   getFailureGrowthShards,
   getSkillEffectTotal,
   getRarityIndex,
+  getMergeRequirement,
+  getRarity,
   pickRarity,
   purchaseSkill,
   resolveJackpotReward,
@@ -35,6 +37,7 @@ import {
   getUniqueUnitExperience,
   getUniqueUnitExperienceRequirement,
   getUniqueUnitLevel,
+  getUnitDefinition,
   grantUniqueUnitExperience,
   registerUniqueUnitAcquisition,
   UNIT_DEFINITIONS,
@@ -134,6 +137,48 @@ describe("lotto defence game systems", () => {
     ).toEqual([getRarityIndex("advanced"), getRarityIndex("rare")]);
   });
 
+  test("unique is the tier above immortal and holds only the five ability guardians", () => {
+    expect(RARITIES.map((r) => r.id).slice(-2)).toEqual(["immortal", "unique"]);
+    expect(getRarity("unique").label).toBe("유니크");
+
+    const uniques = UNIT_DEFINITIONS.filter((unit) => unit.uniqueAbility && !unit.superUnique);
+    expect(uniques).toHaveLength(5);
+    expect(uniques.every((unit) => unit.rarity === "unique")).toBe(true);
+    // the tier generates no generic units of its own
+    expect(UNIT_DEFINITIONS.filter((unit) => unit.rarity === "unique" && !unit.uniqueAbility)).toEqual([]);
+  });
+
+  test("every unique out-attacks and out-paces the immortal of its role", () => {
+    for (const unique of UNIT_DEFINITIONS.filter((unit) => unit.uniqueAbility && !unit.superUnique)) {
+      const immortal = getUnitDefinition(`immortal-${unique.role}`);
+      expect(unique.attack).toBeGreaterThan(immortal.attack);
+      // lower is faster
+      expect(unique.attackSpeed).toBeLessThan(immortal.attackSpeed);
+    }
+  });
+
+  test("two immortals fuse into a unique while other tiers still need three", () => {
+    expect(getMergeRequirement("immortal")).toBe(2);
+    for (const rarity of ["common", "rare", "legendary", "mythic", "transcendent"] as const) {
+      expect(getMergeRequirement(rarity)).toBe(3);
+    }
+
+    const simulation = new GameSimulation(createDefaultMetaProgress(), createSeededRng(11));
+    simulation.state = {
+      ...simulation.state,
+      board: [
+        createTestUnit("immortal-1", "immortal-single", 120, 148),
+        createTestUnit("immortal-2", "immortal-single", 148, 148),
+      ],
+    };
+
+    const prompt = simulation.requestMerge(0)!;
+    expect(prompt).not.toBeNull();
+    expect(prompt.sourceSlots).toEqual([0, 1]);
+    expect(prompt.candidates.every((candidate) => candidate.rarity === "unique")).toBe(true);
+    expect(prompt.candidates.every((candidate) => Boolean(candidate.uniqueAbility))).toBe(true);
+  });
+
   test("mergeable slots are exposed for field UI hints", () => {
     const simulation = new GameSimulation(createDefaultMetaProgress(), createSeededRng(7));
     const common = UNIT_DEFINITIONS.find((unit) => unit.rarity === "common" && unit.role === "single")!;
@@ -151,8 +196,10 @@ describe("lotto defence game systems", () => {
       ],
     };
 
-    expect([...simulation.getMergeableSlots()].sort((a, b) => a - b)).toEqual([0, 1, 2, 3, 4, 5]);
-    expect(simulation.getMergeableGroups()).toEqual([[0, 1, 2], [3, 4, 5]]);
+    // commons still fuse in threes; immortals pair into a unique, so the third
+    // immortal has no partner and is not mergeable on its own
+    expect([...simulation.getMergeableSlots()].sort((a, b) => a - b)).toEqual([0, 1, 2, 3, 4]);
+    expect(simulation.getMergeableGroups()).toEqual([[0, 1, 2], [3, 4]]);
   });
 
   test("waves contain 120 ordinary rounds, with bosses as stages that follow every fifth", () => {
@@ -399,7 +446,7 @@ describe("lotto defence game systems", () => {
     const poisonSimulation = new GameSimulation(createDefaultMetaProgress(), createStaticRng(1));
     const poisonUnit = UNIT_DEFINITIONS.find((unit) => unit.id === "mythic-plague-warlock")!;
     poisonSimulation.state = { ...poisonSimulation.state, board: [createTestUnit("poison", poisonUnit.id, 195, 148)] };
-    poisonSimulation.enemies.push(createTestEnemy("poison-target", 0.1, 500));
+    poisonSimulation.enemies.push(createTestEnemy("poison-target", 0.1, 200_000));
 
     poisonSimulation.update(1);
     const poisonTarget = poisonSimulation.enemies[0]!;
@@ -411,14 +458,14 @@ describe("lotto defence game systems", () => {
     const slowSimulation = new GameSimulation(createDefaultMetaProgress(), createStaticRng(1));
     const slowUnit = UNIT_DEFINITIONS.find((unit) => unit.id === "transcendent-time-mage")!;
     slowSimulation.state = { ...slowSimulation.state, board: [createTestUnit("slow", slowUnit.id, 195, 148)] };
-    slowSimulation.enemies.push(createTestEnemy("slow-target", 0.1, 500));
+    slowSimulation.enemies.push(createTestEnemy("slow-target", 0.1, 200_000));
     slowSimulation.update(1);
     expect(slowSimulation.enemies[0]!.effects.some((effect) => effect.kind === "slow")).toBe(true);
 
     const freezeSimulation = new GameSimulation(createDefaultMetaProgress(), createSequenceRng([1, 0]));
     const freezeUnit = UNIT_DEFINITIONS.find((unit) => unit.id === "transcendent-frost-witch")!;
     freezeSimulation.state = { ...freezeSimulation.state, board: [createTestUnit("freeze", freezeUnit.id, 195, 148)] };
-    freezeSimulation.enemies.push(createTestEnemy("freeze-target", 0.1, 500));
+    freezeSimulation.enemies.push(createTestEnemy("freeze-target", 0.1, 200_000));
     freezeSimulation.update(1);
     const frozenProgress = freezeSimulation.enemies[0]!.progress;
     expect(freezeSimulation.enemies[0]!.effects.some((effect) => effect.kind === "freeze")).toBe(true);
@@ -428,7 +475,7 @@ describe("lotto defence game systems", () => {
     const berserkSimulation = new GameSimulation(createDefaultMetaProgress(), createStaticRng(1));
     const berserker = UNIT_DEFINITIONS.find((unit) => unit.id === "immortal-berserker")!;
     berserkSimulation.state = { ...berserkSimulation.state, board: [createTestUnit("berserk", berserker.id, 195, 148)] };
-    berserkSimulation.enemies.push(createTestEnemy("berserk-target", 0.1, 500));
+    berserkSimulation.enemies.push(createTestEnemy("berserk-target", 0.1, 200_000));
     berserkSimulation.update(1);
     expect(berserkSimulation.state.board[0]!.berserkRemainingMs).toBeGreaterThan(0);
     const cooldownAfterHit = berserkSimulation.state.board[0]!.cooldownMs;
@@ -477,7 +524,8 @@ describe("lotto defence game systems", () => {
       const levelOne = getEffectiveUnitStats(uniqueUnit, 1);
       const levelNinetyNine = getEffectiveUnitStats(uniqueUnit, 999);
       expect(levelNinetyNine.attack).toBeGreaterThan(levelOne.attack * 3);
-      expect(levelNinetyNine.attackSpeed).toBeLessThan(levelOne.attackSpeed * 0.5);
+      expect(levelNinetyNine.attackSpeed).toBeLessThan(levelOne.attackSpeed);
+      expect(levelNinetyNine.attackSpeed).toBe(180);
       expect(levelNinetyNine.range).toBe(levelOne.range + 50);
       expect(levelNinetyNine.criticalChance).toBeCloseTo(levelOne.criticalChance + 0.25);
     }

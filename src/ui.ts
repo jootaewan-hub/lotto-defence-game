@@ -45,7 +45,7 @@ export function createUi(sim: GameSimulation, persistProgress = true): UiHandle 
     <div class="super-access"><button id="super-forge-button">${icon('diamond')} 슈퍼유니크 각성</button><button id="dragon-shop-button">${icon('swords')} 드래곤 상점</button></div><button id="blessings-button" class="blessings-button"><span>${icon('book')} 원정 축복</span><b id="blessings-count">0개</b></button><button id="skill-toggle" class="growth-button"><span>${icon('moon')} 영구 성장</span><span id="shard-count"></span></button>
    </aside>
   </section>
-  <section class="roster-panel"><div class="roster-heading"><div><h2>나의 수호자</h2><span id="roster-hint">불멸 3개 → 유니크 · 유니크 동시 보유 최대 2명</span></div><div class="roster-tools"><button id="sort-button" class="quiet-button">자동 배치</button><select id="merge-rarity" aria-label="합성할 타워 등급">${RARITIES.map(r=>`<option value="${r.id}">${r.label}</option>`).join('')}</select><button id="stage-merge-button" class="quiet-button">단계별 합성</button><button id="bulk-merge-button" class="quiet-button">일괄 합성 <span id="merge-count">0</span></button></div></div><div id="roster" class="roster"></div></section>
+  <section class="roster-panel"><div class="roster-heading"><div><h2>나의 수호자</h2><span id="roster-hint">불멸 2개 → 유니크 · 유니크 동시 보유 최대 2명</span></div><div class="roster-tools"><button id="sort-button" class="quiet-button">자동 배치</button><select id="merge-rarity" aria-label="합성할 타워 등급">${RARITIES.filter(r=>r.id!=='unique').map(r=>`<option value="${r.id}">${r.label}</option>`).join('')}</select><button id="stage-merge-button" class="quiet-button">단계별 합성</button><button id="bulk-merge-button" class="quiet-button">일괄 합성 <span id="merge-count">0</span></button></div></div><div id="roster" class="roster"></div></section>
   <footer><span>${icon('moon')} 달빛 수호대</span><p>Q 소환 <i>·</i> W 고급 <i>·</i> A 전설 <i>·</i> E 결계 <i>·</i> Space 일시정지</p><span>성장 기록 자동 저장</span></footer>
  </main><dialog id="game-dialog" aria-labelledby="dialog-title"><div id="dialog-content"></div></dialog>`;
     let scene: GameScene | null = null, selected: number | null = null, speed = 1, paused = false, muted = true, dialogKind = '', rosterKey = '', saved = JSON.stringify(sim.meta), toastTimer = 0;
@@ -112,7 +112,7 @@ export function createUi(sim: GameSimulation, persistProgress = true): UiHandle 
         const prompt = sim.requestMerge(selected ?? undefined);
         if (!prompt)
             return;
-        open('merge', heading('수호자의 각성', '다음 수호자를 선택하세요', '같은 수호자 3명이 한 단계 높은 수호자로 다시 태어납니다.') + `<div class="choice-grid">${prompt.candidates.map(d => `<button data-merge="${d.id}" class="choice">${unitArtMarkup(d)}<small style="color:${getRarity(d.rarity).color}">${getEvolutionVisual(d).label} · ${getRarity(d.rarity).label}</small><h3>${d.name}</h3><p>${d.skill}</p></button>`).join('')}</div><button data-close class="quiet-button">돌아가기</button>`);
+        open('merge', heading('수호자의 각성', '다음 수호자를 선택하세요', `같은 수호자 ${prompt.sourceSlots.length}명이 한 단계 높은 수호자로 다시 태어납니다.`) + `<div class="choice-grid">${prompt.candidates.map(d => `<button data-merge="${d.id}" class="choice">${unitArtMarkup(d)}<small style="color:${getRarity(d.rarity).color}">${getEvolutionVisual(d).label} · ${getRarity(d.rarity).label}</small><h3>${d.name.replace(getRarity(d.rarity).label + ' ', '')}</h3><p>${d.skill}</p></button>`).join('')}</div><button data-close class="quiet-button">돌아가기</button>`);
     });
     button('frost-button', () => { if (sim.castFrost())
         scene?.pulseFrost(); });
