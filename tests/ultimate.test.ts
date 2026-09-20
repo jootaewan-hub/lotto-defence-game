@@ -4,24 +4,25 @@ import { createDefaultMetaProgress, createSeededRng } from '../src/game/systems'
 import { getUnitDefinition, getUnitsByRarity } from '../src/game/units';
 import type { EnemyState, UnitInstance } from '../src/game/types';
 import { superForgeMarkup } from '../src/superUi';
+import { ULTIMATE_COST } from '../src/game/ultimate';
 
 const game = () => new GameSimulation(createDefaultMetaProgress(), createSeededRng(8));
 const ingredients = (): UnitInstance[] => ['archer','warrior','mage','priest'].map((type, i) => ({instanceId:`s${i}`,definitionId:`super-${type}`,x:150+i*30,y:148,cooldownMs:0,attackUpgradePercent:10,speedUpgradePercent:5,upgradeCount:2,upgradeGoldSpent:65,items:[{kind:'weapon',level:i+1,bonus:100*(i+1)}]}));
 const enemy = (id:string, boss=false): EnemyState => ({id,wave:1,variantId:'grunt',variantLabel:'test',variantTint:0,variantTier:0,hp:1e9,maxHp:1e9,armor:1e9,effects:[],progress:.8,speed:0,rewardGold:1,isBoss:boss});
 
-test('ultimate consumes exactly four distinct supers and 20000 gold, inheriting upgrades and equipment', () => {
-  const sim=game(); sim.state.board=ingredients(); sim.state.gold=20000;
+test('ultimate consumes exactly four distinct supers and its whole fee, inheriting upgrades and equipment', () => {
+  const sim=game(); sim.state.board=ingredients(); sim.state.gold=ULTIMATE_COST;
   expect(sim.craftUltimate()).toBe(true);
   expect(sim.state.gold).toBe(0); expect(sim.state.board).toHaveLength(1);
   expect(sim.state.board[0]).toMatchObject({definitionId:'ultimate-mugeuk',attackUpgradePercent:40,speedUpgradePercent:20,upgradeCount:8,upgradeGoldSpent:260,items:[{kind:'weapon',level:4,bonus:1000}]});
   expect(sim.meta.uniqueUnitLevels['ultimate-mugeuk']).toBe(1);
-  sim.state.gold=20000; sim.state.board.push(...ingredients());
+  sim.state.gold=ULTIMATE_COST; sim.state.board.push(...ingredients());
   const before=JSON.stringify(sim.state); expect(sim.craftUltimate()).toBe(false); expect(JSON.stringify(sim.state)).toBe(before);
 });
 
 test.each(['gold','missing','duplicate','reward','ended'])('invalid %s recipe never consumes resources', condition => {
-  const sim=game(); sim.state.board=ingredients(); sim.state.gold=20000;
-  if(condition==='gold')sim.state.gold=19999;
+  const sim=game(); sim.state.board=ingredients(); sim.state.gold=ULTIMATE_COST;
+  if(condition==='gold')sim.state.gold=ULTIMATE_COST-1;
   if(condition==='missing')sim.state.board.pop();
   if(condition==='duplicate')sim.state.board[3]!.definitionId='super-archer';
   if(condition==='reward')sim.pendingReward=true;
@@ -37,8 +38,8 @@ test('ultimate is excluded from ordinary summon pools', () => {
 test('forge shows missing materials, exact price, skill details and owned lock', () => {
   const sim=game();
   expect(superForgeMarkup(sim)).toContain('data-craft-ultimate disabled');
-  sim.state.board=ingredients();sim.state.gold=20000;
-  expect(superForgeMarkup(sim)).toContain('무극신 강림 · 20,000G');
+  sim.state.board=ingredients();sim.state.gold=ULTIMATE_COST;
+  expect(superForgeMarkup(sim)).toContain(`무극신 강림 · ${ULTIMATE_COST.toLocaleString()}G`);
   expect(superForgeMarkup(sim)).toContain('무극·천지개벽');
   sim.craftUltimate(); expect(superForgeMarkup(sim)).toContain('무극신 보유 중');
   expect(sim.getSuperRecipe('warrior').owned).toBe(false);

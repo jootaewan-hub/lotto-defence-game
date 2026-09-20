@@ -2,7 +2,7 @@ import type { DragonItemKind, TowerType, UnitInstance } from './types';
 import { getTowerType, getUnitDefinition, isUniqueUnit } from './units';
 export const MAX_TOWERS = 200;
 export const MAX_ITEM_UPGRADE_LEVEL = 24;
-export const SUPER_COST = 40000;
+export const SUPER_COST = 20000;
 /** How many of each feeder grade an awakening takes, beside the one unique. */
 export const SUPER_INGREDIENT_COUNT = 2;
 export const SUPER_FEEDER_RARITIES = ['legendary', 'mythic', 'transcendent', 'immortal'] as const;
