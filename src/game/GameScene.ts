@@ -1,3 +1,5 @@
+import { BOSS_FRAMES, getBossVisual } from './bossVisuals';
+import { drawBossAura, drawMugeukAura } from './SovereignEffects';
 import { getEvolutionVisual } from './evolutionVisuals';
 import { drawEvolutionOrnaments } from './EvolutionEffects';
 import { BATTLE_THEMES } from './battleThemes';
@@ -36,7 +38,8 @@ export class GameScene extends Phaser.Scene {
             this.load.image(key, `${ASSETS}${key}.png`);
         this.load.image('super-atlas', `${import.meta.env.BASE_URL}assets/generated/super-unique-atlas.png`);
         this.load.image('evolution-atlas', `${import.meta.env.BASE_URL}assets/generated/tower-evolution-atlas.png`);
-        this.load.svg('ultimate-mugeuk', `${import.meta.env.BASE_URL}assets/generated/ultimate-mugeuk.svg`);
+        this.load.image('ultimate-mugeuk', `${import.meta.env.BASE_URL}assets/generated/ultimate-mugeuk-v2.png`);
+        for (const id of BOSS_FRAMES) this.load.image(`boss-${id}`, `${import.meta.env.BASE_URL}assets/generated/bosses/${id}.png`);
         this.load.image('forest', `${import.meta.env.BASE_URL}assets/moonwood.png`);
         for (const difficulty of ['nightmare', 'hell', 'insane'] as const)
             this.load.svg(BATTLE_THEMES[difficulty].texture, `${import.meta.env.BASE_URL}assets/backgrounds/${difficulty}.svg`);
@@ -214,7 +217,7 @@ export class GameScene extends Phaser.Scene {
             const def = getUnitDefinition(u.definitionId), p = point(u), rarity = getRarity(def.rarity);
             const color = Phaser.Display.Color.HexStringToColor(rarity.color).color;
             const visual = getEvolutionVisual(def, getUniqueUnitLevel(this.simulation.meta, def.id), board.length);
-            drawEvolutionOrnaments(this.ink, p.x, p.y, visual, getTowerType(def), def.ultimate ? 0xffe6a3 : def.superUnique ? SUPER_COLORS[getTowerType(def)] : color, this.reduced || !step ? 0 : time, board.length > 60);
+            if (!def.ultimate) drawEvolutionOrnaments(this.ink, p.x, p.y, visual, getTowerType(def), def.ultimate ? 0xffe6a3 : def.superUnique ? SUPER_COLORS[getTowerType(def)] : color, this.reduced || !step ? 0 : time, board.length > 60);
             if (i === this.selected) {
                 const range = this.simulation.getTowerCombatStats(i)!.range;
                 this.ink.fillStyle(0x95dfca, 0.045);
@@ -230,7 +233,8 @@ export class GameScene extends Phaser.Scene {
                 this.ink.fillStyle(0xffda8c, 0.85);
                 this.ink.fillCircle(p.x + 20, p.y - 28, 3);
             }
-            if(def.superUnique){
+            if (def.ultimate) drawMugeukAura(this.ink, p.x, p.y, this.reduced ? 0 : time, this.simulation.isSuperBerserk(u));
+            if(def.superUnique && !def.ultimate){
                 const color=def.ultimate?0xffe6a3:SUPER_COLORS[getTowerType(def)],active=this.simulation.isSuperBerserk(u);
                 this.ink.fillStyle(color,active?0.16:0.08);this.ink.fillEllipse(p.x,p.y+7,91,39);
                 this.ink.lineStyle(2,color,0.7);this.ink.strokeEllipse(p.x,p.y+7,81,32);
@@ -267,37 +271,51 @@ export class GameScene extends Phaser.Scene {
             }
         for (const enemy of this.simulation.enemies) {
             const p = point(getPathPosition(enemy.progress));
+            const boss = enemy.isBoss ? getBossVisual(enemy) : null;
+            if (boss) p.y = Math.max(p.y, boss.size * .75 + 10);
+            const frozen = enemy.effects.some(e => e.kind === 'freeze');
+            const motion = this.reduced || !step || frozen ? 0 : time;
+            if (boss) drawBossAura(this.ink, p.x, p.y, boss, motion);
             let img = this.mobs.get(enemy.id);
             if (!img) {
-                img = this.add.image(p.x, p.y, enemy.isBoss ? 'ogre' : enemy.variantTier > 1 ? 'undead' : 'orc').setOrigin(0.5, 0.75).setDepth(6);
-                img.setDisplaySize(enemy.isBoss ? 68 : 38, enemy.isBoss ? 68 : 38);
+                img = this.add.image(p.x, p.y, boss ? `boss-${boss.frame}` : enemy.variantTier > 1 ? 'undead' : 'orc').setOrigin(0.5, 0.75).setDepth(6);
+                img.setDisplaySize(boss?.size ?? 38, boss?.size ?? 38);
                 this.mobs.set(enemy.id, img);
             }
-            const frozen = enemy.effects.some(e => e.kind === 'freeze');
-            img.setPosition(p.x, p.y + (this.reduced || !step || frozen ? 0 : Math.sin(time / 95 + enemy.progress * 80) * 1.5));
+            const phase = motion ? motion / (boss?.floating ? 400 : 125) + enemy.progress * 80 : 0;
+            const bob = Math.sin(phase) * (boss?.floating ? 4 : boss ? 2 : 1.5);
+            img.setPosition(p.x, p.y + bob - (boss?.floating ? 5 : 0));
+            if (boss) {
+                const breath = motion ? Math.sin(motion / 340) * .015 : 0;
+                img.setDisplaySize(boss.size * (1 + breath), boss.size * (1 - breath));
+                img.setRotation(boss.floating ? Math.sin(phase) * .025 : Math.sin(phase) * .045);
+            }
             img.setFlipX(enemy.progress > 0.5);
             if (this.combat.isHit(enemy.id))
                 img.setTintFill(0xfff0cb);
             else if (frozen)
                 img.setTint(0x8edcff);
+            else if (boss?.rank === 1 && enemy.variantTint !== 0xffffff)
+                img.setTint(enemy.variantTint);
             else
                 img.clearTint();
-            const w = enemy.isBoss ? 44 : 26;
+            const w = boss ? boss.size * .55 : 26;
+            const healthY = boss ? boss.size * .73 : 30;
             this.ink.fillStyle(0x071319, 0.9);
-            this.ink.fillRoundedRect(p.x - w / 2 - 1, p.y - (enemy.isBoss ? 51 : 30), w + 2, 5, 2);
+            this.ink.fillRoundedRect(p.x - w / 2 - 1, p.y - (healthY + 1), w + 2, 5, 2);
             this.ink.fillStyle(enemy.isBoss ? 0xe8a060 : 0xcc7777);
-            this.ink.fillRect(p.x - w / 2, p.y - (enemy.isBoss ? 50 : 29), w * Math.max(0, enemy.hp / enemy.maxHp), 3);
+            this.ink.fillRect(p.x - w / 2, p.y - healthY, w * Math.max(0, enemy.hp / enemy.maxHp), 3);
         }
         // A lethal hit must not erase its target before the visible projectile arrives.
         for (const [id, target] of this.combat.heldTargets()) {
             if (enemyIds.has(id)) continue;
             let img = this.mobs.get(id);
             if (!img) {
-                img = this.add.image(target.position.x, target.position.y + 10, target.isBoss ? 'ogre' : target.variantTier > 1 ? 'undead' : 'orc').setOrigin(0.5, 0.75).setDepth(6);
-                img.setDisplaySize(target.isBoss ? 68 : 38, target.isBoss ? 68 : 38);
+                img = this.add.image(target.position.x, target.position.y + 10, target.boss ? `boss-${target.boss.frame}` : target.variantTier > 1 ? 'undead' : 'orc').setOrigin(0.5, 0.75).setDepth(6);
+                img.setDisplaySize(target.boss?.size ?? 38, target.boss?.size ?? 38);
                 this.mobs.set(id, img);
             }
-            img.setPosition(target.position.x, target.position.y + 10);
+            img.setPosition(target.position.x, Math.max(target.position.y + 10, target.boss ? target.boss.size * .75 + 10 : 0));
             if (this.combat.isHit(id)) img.setTintFill(0xffe1ad).setAlpha(0.65);
         }
         if (events.length) {

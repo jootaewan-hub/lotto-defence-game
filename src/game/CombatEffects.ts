@@ -1,4 +1,6 @@
+import { dimensionalBurst, dimensionalProjectile, crystal, glow, orbit } from './DimensionalEffects';
 import Phaser from 'phaser';
+import { getBossVisual } from './bossVisuals';
 import type { Point } from './geometry';
 import type { SimulationEvent } from './simulation';
 import { advanceHoming, getCombatStyle, type CombatStyle } from './combatVisuals';
@@ -31,11 +33,13 @@ interface Target {
     position: Point;
     isBoss: boolean;
     variantTier: number;
+    boss?: ReturnType<typeof getBossVisual>;
 }
 const project = (p: Point): Point => ({ x: p.x * 1.8 + 39, y: p.y * 1.25 - 62.5 });
 /** Target-locked presentation. Combat resolution stays deterministic in GameSimulation. */
 export class CombatEffects {
     private graphics: Phaser.GameObjects.Graphics;
+    private dimensionalCount = 0;
     private flights: Flight[] = [];
     private impacts: Impact[] = [];
     private bursts: {event:Extract<SimulationEvent,{type:'superSkill'}>;age:number}[] = [];
@@ -64,6 +68,8 @@ export class CombatEffects {
             const style = getCombatStyle(event.role, ability, event.rarityTier, event.unitLevel);
             if(event.superType){style.intensity+=3;style.radius+=3;style.sparks=Math.min(24,style.sparks+6);}
             const start = project(event.from), end = project(event.to);
+            const boss = event.target.isBoss ? getBossVisual({ isBoss: true, wave: event.target.wave ?? 5, trueBossId: event.target.trueBossId, variantTint: event.target.variantTint ?? 0xffffff }) : undefined;
+            if (boss) end.y = Math.max(end.y, boss.size * .75);
             const angle = Math.atan2(end.y - start.y, end.x - start.x);
             // Origin follows the weapon side; the unit's foot position never changes.
             start.x += Math.cos(angle) * 18;
@@ -71,7 +77,8 @@ export class CombatEffects {
             const oldPose = this.poses.get(event.sourceId);
             if (!oldPose || oldPose.age > 170)
                 this.poses.set(event.sourceId, { age: 0, dx: Math.cos(angle), dy: Math.sin(angle), style });
-            this.targets.set(event.target.id, { position: end, isBoss: event.target.isBoss, variantTier: event.target.variantTier });
+            this.targets.set(event.target.id, { position: end, isBoss: event.target.isBoss, variantTier: event.target.variantTier,
+                boss });
             // Only simplify excess decoration. Every attack still gets a target-locked hit.
             if (this.flights.length >= 240) {
                 const oldest = this.flights.shift()!;
@@ -84,10 +91,13 @@ export class CombatEffects {
     update(delta: number, speed: number, liveTargets: Map<string, Point>) {
         const dt = Math.min(delta, 80) * Math.min(speed, 3);
         this.graphics.clear();
+        this.dimensionalCount = 0;
         for (const [id, position] of liveTargets) {
             const target = this.targets.get(id);
-            if (target)
+            if (target) {
                 target.position = project(position);
+                if (target.boss) target.position.y = Math.max(target.position.y, target.boss.size * .75);
+            }
         }
         for (const [id, pose] of this.poses) {
             pose.age += Math.min(delta, 80) * Math.min(speed, 2);
@@ -175,23 +185,19 @@ export class CombatEffects {
         this.graphics.clear();
     }
     private drawSuperBurst(event:Extract<SimulationEvent,{type:'superSkill'}>,age:number){
-        const t=Math.min(1,age/850),alpha=1-t,g=this.graphics;
-        const color=event.skill==='heaven-split'?0xffe6a3:event.skill==='blessing'?0xc6acff:event.skill==='inferno'?0xff8454:event.skill==='dragon-ring'||event.skill==='dragon-magic'?0xffda78:0xffb5a0;
-        const p=project(event.at),global=event.skill==='heaven-split'||event.skill==='inferno'||event.skill==='dragon-ring';
-        const center=global?{x:390,y:245}:p,radius=(global?330:80)*Math.sqrt(t);
-        g.fillStyle(color,alpha*(global?0.035:0.07));g.fillCircle(center.x,center.y,radius);
-        g.lineStyle(global?3:2,color,alpha*0.7);g.strokeCircle(center.x,center.y,radius);
-        g.lineStyle(1,0xfff0ca,alpha*0.55);g.strokeCircle(center.x,center.y,radius*.8);
-        if(event.skill==='heaven-split'){
-            g.lineStyle(5,0xfff4dc,alpha*.8);g.lineBetween(center.x-radius,center.y-radius*.5,center.x+radius,center.y+radius*.5);
-            g.lineStyle(8,0x10152b,alpha*.7);g.lineBetween(center.x-radius,center.y+radius*.5,center.x+radius,center.y-radius*.5);
-            g.lineStyle(1.5,0xffdc8d,alpha);g.strokeEllipse(center.x,center.y,radius*1.6,radius*.65);
-        }
-        for(let k=0;k<8;k++){const angle=k*Math.PI/4+(this.reduced?0:t);const x=center.x+Math.cos(angle)*radius,y=center.y+Math.sin(angle)*radius;this.star({x,y},(global?14:7)*alpha,color,alpha,angle);}
-        for(const target of (event.targets??[]).slice(0,24)){
+        const t=Math.min(1,age/850),p=project(event.at);
+        const global=event.skill==='heaven-split'||event.skill==='inferno'||event.skill==='dragon-ring';
+        const center=global?{x:390,y:245}:p;
+        dimensionalBurst(this.graphics,center.x,center.y,event.skill,t,this.reduced);
+        for(const target of (event.targets??[]).slice(0,this.reduced?6:16)){
             const end=project(target);
-            if(event.skill==='blessing'){g.lineStyle(1.5,color,alpha*.5);g.lineBetween(p.x,p.y,end.x,end.y);g.lineStyle(2,color,alpha);g.strokeEllipse(end.x,end.y+14,40+20*t,18+10*t);}
-            else {g.lineStyle(3,color,alpha);g.lineBetween(end.x,end.y-65*alpha,end.x,end.y);this.star(end,12*alpha,0xffe5a7,alpha,t);}
+            if(event.skill==='blessing'){
+                orbit(this.graphics,end.x,end.y+12,24+12*t,t*2,0xd4b6ff,1-t,1.1);
+                glow(this.graphics,end.x,end.y-8,15,0xd4b6ff,(1-t)*.55);
+            }else{
+                crystal(this.graphics,end.x,end.y-30*(1-t),5*(1-t),22*(1-t),t*3,0xffe9b4,1-t);
+                glow(this.graphics,end.x,end.y,20*t,0xffc578,1-t);
+            }
         }
     }
     private impact(flight: Flight, at: Point) {
@@ -235,6 +241,10 @@ export class CombatEffects {
         }
         if(f.event.superType&&!this.reduced){
             for(const sign of [-1,1]){g.lineStyle(1.4,s.core,0.75);g.beginPath();for(let j=0;j<7;j++){const back=j*7,wave=Math.sin(f.age*.025-j*.7)*sign*(6+s.intensity);const x=p.x-dx*back+nx*wave,y=p.y-dy*back+ny*wave;if(j===0)g.moveTo(x,y);else g.lineTo(x,y);}g.strokePath();}
+        }
+        if ((f.event.superType || f.event.ability || s.intensity >= 3) && this.dimensionalCount++ < 40) {
+            dimensionalProjectile(g, p, s, f.age, this.reduced);
+            return;
         }
         switch (s.kind) {
             case 'blade':
@@ -320,6 +330,11 @@ export class CombatEffects {
     private drawImpact(impact: Impact) {
         const g = this.graphics, p = impact.position, s = impact.style;
         const t = impact.age / 360, alpha = Math.max(0, 1 - t), r = (8 + s.intensity * 3) * (0.35 + t * 1.5);
+        if (s.intensity >= 3) {
+            glow(g,p.x,p.y,r*1.7,s.color,alpha*.65);
+            orbit(g,p.x,p.y+5,r*1.4,t*3,s.core,alpha,1.05);
+            for(let i=0;i<(this.reduced?2:5);i++){const a=i*Math.PI*2/5;crystal(g,p.x+Math.cos(a)*r,p.y+Math.sin(a)*r*.45-18*Math.sin(t*Math.PI),3*alpha,8*alpha,a+t*4,s.color,alpha);}
+        }
         g.fillStyle(s.color, alpha * 0.2);
         g.fillCircle(p.x, p.y, r);
         g.lineStyle(2 * alpha, s.color, alpha * 0.8);

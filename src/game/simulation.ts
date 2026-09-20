@@ -62,7 +62,7 @@ export type SimulationEvent =
       superType?: TowerType;
       sourceId: string;
       unitLevel: number;
-      target: { id: string; isBoss: boolean; variantTier: number };
+      target: { id: string; isBoss: boolean; variantTier: number; wave?: number; trueBossId?: EnemyState['trueBossId']; variantTint?: number };
       from: { x: number; y: number };
       to: { x: number; y: number };
       critical: boolean;

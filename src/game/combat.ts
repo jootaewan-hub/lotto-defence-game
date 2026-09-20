@@ -221,7 +221,7 @@ export function attackEnemies(ctx: CombatContext, deltaMs: number): void {
         sourceId: unit.instanceId,
         superType,
         unitLevel: uniqueLevel,
-        target: { id: target.id, isBoss: target.isBoss, variantTier: target.variantTier },
+        target: { id: target.id, isBoss: target.isBoss, variantTier: target.variantTier, wave: target.wave, trueBossId: target.trueBossId, variantTint: target.variantTint },
         from: origin,
         to: targetPosition,
         critical,

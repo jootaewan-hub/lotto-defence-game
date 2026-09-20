@@ -8,7 +8,7 @@ import { getEvolutionVisual } from './game/evolutionVisuals';
 export function unitArtMarkup(unit: UnitDefinition): string {
     const stage = getEvolutionVisual(unit).stage;
     const color = getRarity(unit.rarity).color;
-    if (unit.ultimate) return `<span class="unit-art ultimate-art"><img src="${import.meta.env.BASE_URL}assets/generated/ultimate-mugeuk.svg" alt="무극신"></span>`;
+    if (unit.ultimate) return `<span class="unit-art ultimate-art"><img src="${import.meta.env.BASE_URL}assets/generated/ultimate-mugeuk-v2.png" alt="무극신"></span>`;
     if (unit.superUnique) {
         const positions = { archer: '0% 0%', warrior: '100% 0%', mage: '0% 100%', priest: '100% 100%' };
         return `<span class="unit-art super-art" role="img" aria-label="${unit.name}" style="background-image:url('${import.meta.env.BASE_URL}assets/generated/super-unique-atlas.png');background-position:${positions[getTowerType(unit)]}"></span>`;
