@@ -2,7 +2,7 @@ import { RARITIES, getRarityIndex } from "./rarities";
 import { createSeededRng, type Rng } from "./rng";
 import { createDefaultMetaProgress, getSkillEffectTotal } from "./skills";
 import type { JackpotReward, KillGoldReward, MetaProgress, RarityId, RunState, UnitDefinition } from "./types";
-import { getUnitDefinition, getUnitsByRarity, UNIT_DEFINITIONS, isUniqueUnit } from "./units";
+import { getTowerType, getUnitDefinition, getUnitsByRarity, UNIT_DEFINITIONS, isUniqueUnit } from "./units";
 
 export { RARITIES, getRarity, getRarityIndex } from "./rarities";
 export { createRandomRng, createSeededRng } from "./rng";
@@ -142,9 +142,13 @@ export function createMergeCandidates(sourceUnitId: string, rng: Rng): UnitDefin
   const nextRarity = RARITIES[sourceIndex + 1];
 
   if (isUniqueUnit(source)) throw new Error("유니크는 일반 합성할 수 없습니다.");
-  // Unique is a real rarity now, so merging three immortals reaches it the same
-  // way every other tier is reached, with no special case at the top.
-  const candidates = nextRarity ? getUnitsByRarity(nextRarity.id) : [];
+  // Unique is a real rarity now, so merging immortals reaches it the same way
+  // every other tier is reached. Uniques alone are type-bound: two immortal
+  // mages fuse into a mage unique, never into an archer one.
+  const pool = nextRarity ? getUnitsByRarity(nextRarity.id) : [];
+  const candidates = nextRarity?.id === "unique"
+    ? pool.filter((unit) => getTowerType(unit) === getTowerType(source))
+    : pool;
   for (let index = candidates.length - 1; index > 0; index -= 1) {
     const swapIndex = Math.floor(rng.next() * (index + 1));
     [candidates[index], candidates[swapIndex]] = [candidates[swapIndex]!, candidates[index]!];

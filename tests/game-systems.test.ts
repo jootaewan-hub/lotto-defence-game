@@ -38,6 +38,7 @@ import {
   getUniqueUnitExperienceRequirement,
   getUniqueUnitLevel,
   getUnitDefinition,
+  getTowerType,
   grantUniqueUnitExperience,
   registerUniqueUnitAcquisition,
   UNIT_DEFINITIONS,
@@ -177,6 +178,21 @@ describe("lotto defence game systems", () => {
     expect(prompt.sourceSlots).toEqual([0, 1]);
     expect(prompt.candidates.every((candidate) => candidate.rarity === "unique")).toBe(true);
     expect(prompt.candidates.every((candidate) => Boolean(candidate.uniqueAbility))).toBe(true);
+  });
+
+  test("a unique fusion keeps the tower type of the immortals that fed it", () => {
+    for (const source of ["immortal-archer", "immortal-single", "immortal-area", "immortal-support"] as const) {
+      const simulation = new GameSimulation(createDefaultMetaProgress(), createSeededRng(11));
+      simulation.state = {
+        ...simulation.state,
+        board: [createTestUnit("a", source, 120, 148), createTestUnit("b", source, 148, 148)],
+      };
+
+      const prompt = simulation.requestMerge(0)!;
+      const wanted = getTowerType(getUnitDefinition(source));
+      expect(prompt.candidates.length).toBeGreaterThan(0);
+      expect(prompt.candidates.every((candidate) => getTowerType(candidate) === wanted)).toBe(true);
+    }
   });
 
   test("mergeable slots are exposed for field UI hints", () => {

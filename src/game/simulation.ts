@@ -124,6 +124,12 @@ export class GameSimulation {
   rewardChoices: RewardDefinition[] = [];
   pendingRoll: UpgradeRoll | null = null;
   rewardHistory: UpgradeRoll[] = [];
+  /**
+   * The gold roulette upgrades the whole guard, not the tower you spent on, so
+   * one roll is worth the same whichever grade you pick to pay with.
+   */
+  towerAttackUpgradePercent = 0;
+  towerSpeedUpgradePercent = 0;
 
   getUpgradeValue(stat: UpgradeStat): number { return this.upgrades[stat] ?? 0; }
   /** 내부 전용. combat.ts가 CombatContext로 접근하므로 private이 아니다. 소비자 API는 아니다. */
@@ -235,8 +241,8 @@ export class GameSimulation {
     const roleStat = definition.role === 'single' ? 'singleDamage' : definition.role === 'area' ? 'areaDamage' : 'supportDamage';
     return { ...stats,
       baseAttack: definition.attack,
-      attack: (stats.attack + equipmentAttack) * (1 + (unit.attackUpgradePercent ?? 0) / 100) * (1 + getSkillEffectTotal(this.meta, 'attackBonus') + this.expeditionAttackBonus + (shared?.formation??this.formationBonus)) * (1 + this.bonus(roleStat)) * aura * berserk,
-      attackSpeed: Math.max(35, stats.attackSpeed / ((1 + this.bonus('haste') + (unit.speedUpgradePercent??0)/100 + (boots?boots.bonus+(boots.waveSpeedPercent??0):0)/100) * aura * berserk)),
+      attack: (stats.attack + equipmentAttack) * (1 + ((unit.attackUpgradePercent ?? 0) + this.towerAttackUpgradePercent) / 100) * (1 + getSkillEffectTotal(this.meta, 'attackBonus') + this.expeditionAttackBonus + (shared?.formation??this.formationBonus)) * (1 + this.bonus(roleStat)) * aura * berserk,
+      attackSpeed: Math.max(35, stats.attackSpeed / ((1 + this.bonus('haste') + ((unit.speedUpgradePercent??0) + this.towerSpeedUpgradePercent)/100 + (boots?boots.bonus+(boots.waveSpeedPercent??0):0)/100) * aura * berserk)),
       range: stats.range * (1 + this.bonus('range')),
       criticalChance: Math.min(0.85, stats.criticalChance + this.bonus('criticalChance')),
     };
@@ -275,8 +281,8 @@ export class GameSimulation {
     if (roll.kind === 'tower') {
       const unit = this.state.board.find(u => u.instanceId === roll.towerId);
       if (!unit) { this.state.gold += roll.cost ?? 0; this.pendingRoll = null; return false; }
-      if(roll.stat==='haste')unit.speedUpgradePercent=Math.round(((unit.speedUpgradePercent??0)+roll.value)*100)/100;
-      else unit.attackUpgradePercent = Math.round(((unit.attackUpgradePercent ?? 0) + roll.value)*100)/100;
+      if (roll.stat === 'haste') this.towerSpeedUpgradePercent = Math.round((this.towerSpeedUpgradePercent + roll.value) * 100) / 100;
+      else this.towerAttackUpgradePercent = Math.round((this.towerAttackUpgradePercent + roll.value) * 100) / 100;
       unit.upgradeCount = (unit.upgradeCount ?? 0) + 1;
       unit.upgradeGoldSpent = (unit.upgradeGoldSpent ?? 0) + (roll.cost ?? 0);
     } else {
