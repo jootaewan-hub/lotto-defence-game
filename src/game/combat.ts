@@ -100,7 +100,7 @@ export function spawnEnemies(ctx: CombatContext, deltaMs: number): void {
     const hpMultiplier = variant.hpMultiplier * (trueBoss?.hpMultiplier ?? 1);
     const armorMultiplier = variant.armorMultiplier * (trueBoss?.armorMultiplier ?? 1);
     const hp = Math.round(Math.round(baseHp * wave.healthMultiplier * hpMultiplier) * ctx.difficulty.statMultiplier);
-    const armor = Math.round(Math.round(getWaveArmor(wave.scalingWave, wave.isBoss) * armorMultiplier) * ctx.difficulty.statMultiplier);
+    const armor = Math.round(Math.round(getWaveArmor(wave.scalingWave, wave.isBoss) * armorMultiplier) * ctx.difficulty.armorMultiplier);
     // Double each spawn batch, including bosses, without changing wave timing.
     for (let copy = 0; copy < ctx.difficulty.spawnMultiplier; copy += 1) {
       ctx.enemies.push({
@@ -124,7 +124,7 @@ export function spawnEnemies(ctx: CombatContext, deltaMs: number): void {
               wave.isBoss
                 ? 58 + Math.floor((wave.number - 1) / 5) * 18 + wave.number
                 : 5 + Math.floor(wave.number / 4) + Math.floor((wave.number - 1) / 5),
-            ) * variant.rewardMultiplier * (trueBoss?.rewardMultiplier ?? 1),
+            ) * variant.rewardMultiplier * (trueBoss?.rewardMultiplier ?? 1) * ctx.difficulty.goldMultiplier,
           ),
         ),
         isBoss: wave.isBoss,

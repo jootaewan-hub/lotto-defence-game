@@ -13,7 +13,7 @@ describe('random blessings and gold forging', () => {
         sim.state.baseHealth = 10;
         sim.upgrades = { waveGold: 12, interest: 5, regeneration: 2, summonDiscount: 20, upgradeDiscount: 20, frostDuration: 20, frostCooldown: 25 };
         expect(sim.summonCost).toBe(8);
-        expect(sim.advancedSummonCost).toBe(40);
+        expect(sim.advancedSummonCost).toBe(Math.round(sim.summonCost * (1 + 4 * (2 / 3))));
         expect(sim.getTowerUpgradeCost(0)).toBe(20);
         sim.startNextWave();
         expect(sim.state.gold).toBe(117);

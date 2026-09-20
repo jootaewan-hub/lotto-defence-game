@@ -3,6 +3,8 @@ import { getTowerType, getUnitDefinition, isUniqueUnit } from './units';
 export const MAX_TOWERS = 200;
 export const MAX_ITEM_UPGRADE_LEVEL = 24;
 export const SUPER_COST = 40000;
+/** How many of each feeder grade an awakening takes, beside the one unique. */
+export const SUPER_INGREDIENT_COUNT = 2;
 export const TOWER_TYPES: TowerType[] = ['archer', 'warrior', 'mage', 'priest'];
 export const TOWER_LABELS: Record<TowerType, string> = { archer: '궁수', warrior: '전사', mage: '마법사', priest: '사제' };
 export const SUPER_COLORS: Record<TowerType, number> = { archer: 0x70dcff, warrior: 0xffbf65, mage: 0xff735a, priest: 0xc4a0ff };
@@ -52,8 +54,8 @@ export function getSuperRecipe(board: readonly UnitInstance[], type: TowerType, 
     // Consume the least-invested ingredients first; preserve upgrades through fusion.
     for (const key of ['unique', 'legendary', 'mythic', 'transcendent', 'immortal'] as const)
         recipe[key].sort((a, b) => (board[a]!.upgradeGoldSpent ?? 0) - (board[b]!.upgradeGoldSpent ?? 0));
-    recipe.ready = !recipe.owned && gold >= SUPER_COST && recipe.unique.length >= 1 && recipe.legendary.length >= 3 && recipe.mythic.length >= 3 && recipe.transcendent.length >= 3 && recipe.immortal.length >= 3;
+    recipe.ready = !recipe.owned && gold >= SUPER_COST && recipe.unique.length >= 1 && recipe.legendary.length >= SUPER_INGREDIENT_COUNT && recipe.mythic.length >= SUPER_INGREDIENT_COUNT && recipe.transcendent.length >= SUPER_INGREDIENT_COUNT && recipe.immortal.length >= SUPER_INGREDIENT_COUNT;
     if (recipe.ready)
-        recipe.slots = [...recipe.unique.slice(0, 1), ...recipe.legendary.slice(0, 3), ...recipe.mythic.slice(0, 3), ...recipe.transcendent.slice(0, 3), ...recipe.immortal.slice(0, 3)];
+        recipe.slots = [...recipe.unique.slice(0, 1), ...recipe.legendary.slice(0, SUPER_INGREDIENT_COUNT), ...recipe.mythic.slice(0, SUPER_INGREDIENT_COUNT), ...recipe.transcendent.slice(0, SUPER_INGREDIENT_COUNT), ...recipe.immortal.slice(0, SUPER_INGREDIENT_COUNT)];
     return recipe;
 }

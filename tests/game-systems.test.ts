@@ -398,7 +398,7 @@ describe("lotto defence game systems", () => {
     }
   });
 
-  test("advanced summon costs five times more and can roll mythic units", () => {
+  test("advanced summon carries the reduced premium and can roll mythic units", () => {
     const rng = {
       next: () => 0.975,
       pick<T>(items: readonly T[]): T {
@@ -408,10 +408,12 @@ describe("lotto defence game systems", () => {
     const simulation = new GameSimulation(createDefaultMetaProgress(), rng);
     simulation.state = { ...simulation.state, gold: 100 };
 
-    expect(simulation.advancedSummonCost).toBe(simulation.summonCost * 5);
-    expect(simulation.legendarySummonCost).toBe(simulation.advancedSummonCost * 3);
+    // the premium over a guardian summon, cut by a third from the original 5x
+    const advancedCost = simulation.advancedSummonCost;
+    expect(advancedCost).toBe(Math.round(simulation.summonCost * (1 + 4 * (2 / 3))));
+    expect(simulation.legendarySummonCost).toBe(advancedCost * 3);
     expect(simulation.summonAdvanced()).toBe(true);
-    expect(simulation.state.gold).toBe(50);
+    expect(simulation.state.gold).toBe(100 - advancedCost);
 
     const summoned = UNIT_DEFINITIONS.find((unit) => unit.id === simulation.state.board[0]!.definitionId);
     expect(summoned?.rarity).toBe("mythic");

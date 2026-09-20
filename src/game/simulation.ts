@@ -94,9 +94,14 @@ export type SimulationEvent =
     };
 
 const BASE_SUMMON_COST = 10;
-const ADVANCED_SUMMON_COST_MULTIPLIER = 5;
+/**
+ * The premium over a guardian summon, cut by a third. At the old 5x and 15x the
+ * legendary summon could not be bought often enough to ever collect three of a
+ * kind, so the tier that climbs the ladder fastest per gold finished last.
+ */
+const ADVANCED_SUMMON_COST_MULTIPLIER = 1 + (5 - 1) * (2 / 3);
 /** Three advanced summons, so the tiers stay in a readable ratio. */
-const LEGENDARY_SUMMON_COST_MULTIPLIER = ADVANCED_SUMMON_COST_MULTIPLIER * 3;
+const LEGENDARY_SUMMON_COST_RATIO = 3;
 
 /** Auto play acts on this cadence so it stays watchable and does not flood the log. */
 const AUTO_ACTION_INTERVAL_MS = 250;
@@ -402,11 +407,11 @@ export class GameSimulation {
   }
 
   get legendarySummonCost(): number {
-    return this.summonCost * LEGENDARY_SUMMON_COST_MULTIPLIER;
+    return this.advancedSummonCost * LEGENDARY_SUMMON_COST_RATIO;
   }
 
   get advancedSummonCost(): number {
-    return this.summonCost * ADVANCED_SUMMON_COST_MULTIPLIER;
+    return Math.round(this.summonCost * ADVANCED_SUMMON_COST_MULTIPLIER);
   }
 
   get canStartWave(): boolean {

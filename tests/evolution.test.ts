@@ -3,6 +3,7 @@ import { RARITIES } from '../src/game/rarities';
 import { getUnitDefinition, getUnitPortrait } from '../src/game/units';
 import { getEvolutionVisual } from '../src/game/evolutionVisuals';
 import { evolutionGalleryMarkup, unitArtMarkup } from '../src/evolutionUi';
+import { SUPER_INGREDIENT_COUNT } from '../src/game/superUnits';
 
 // Unique is the tenth rarity but has no generic units, so it is not a rung on
 // the evolution ladder the gallery draws.
@@ -43,6 +44,6 @@ test('gallery covers all four classes and nine tiers, with separate super awaken
   const gallery = evolutionGalleryMarkup();
   expect(gallery.match(/9단계 · 불멸/g)).toHaveLength(4);
   expect(gallery.match(/별도 조합 · 최종 각성/g)).toHaveLength(4);
-  expect(gallery).toContain('불멸 3');
+  expect(gallery).toContain(`불멸 ${SUPER_INGREDIENT_COUNT}`);
   expect(gallery).not.toContain('super-archer.png');
 });

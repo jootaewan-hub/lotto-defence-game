@@ -4,7 +4,7 @@ import { RARITIES, getRarity } from './game/rarities';
 /** The generic evolution ladder. Unique has no generic units, so it is not a rung. */
 const LADDER = RARITIES.filter(r => r.id !== 'unique');
 import { getTowerType, getUnitPortrait, getUnitDefinition } from './game/units';
-import { TOWER_TYPES, TOWER_LABELS } from './game/superUnits';
+import { TOWER_TYPES, TOWER_LABELS, SUPER_COST, SUPER_INGREDIENT_COUNT } from './game/superUnits';
 import { getEvolutionVisual } from './game/evolutionVisuals';
 
 export function unitArtMarkup(unit: UnitDefinition): string {
@@ -31,5 +31,5 @@ export function evolutionPathMarkup(unit: UnitDefinition): string {
 
 export function evolutionGalleryMarkup(): string {
     const roles = { archer: 'archer', warrior: 'single', mage: 'area', priest: 'support' };
-    return `<span class="dialog-eyebrow">수호자 진화 도감</span><h2 id="dialog-title">작은 수호자에서, 전장의 전설로</h2><p class="dialog-description">숫자는 등급 진화 단계입니다. 같은 수호자 3명을 합성하면 다음 등급으로 진화합니다. 유니크는 별도의 레벨과 스킬 진화도 성장합니다.</p>${TOWER_TYPES.map(type => `<section class="evolution-gallery"><h3>${TOWER_LABELS[type]}</h3><div class="evolution-gallery-grid">${LADDER.map((r, i) => `<article>${unitArtMarkup(getUnitDefinition(`${r.id}-${roles[type]}`))}<b style="color:${r.color}">${i + 1}단계 · ${r.label}</b></article>`).join('')}</div><div class="awakening-preview">${unitArtMarkup(getUnitDefinition(`super-${type}`))}<div><small>별도 조합 · 최종 각성</small><h4>${getUnitDefinition(`super-${type}`).name}</h4><p>같은 유형 유니크 1 + 전설 3 + 신화 3 + 초월 3 + 불멸 3 + 10,000G</p></div></div></section>`).join('')}<section class="awakening-preview ultimate-preview">${unitArtMarkup(getUnitDefinition(ULTIMATE_ID))}<div><small>사신 합일 · 궁극 각성</small><h4>무극신</h4><p>슈퍼유니크 4종 + 20,000G</p>${ULTIMATE_SKILLS.map(s=>`<p><b>${s.name}</b> · ${s.description}</p>`).join('')}</div></section><button data-close class="dialog-primary">전장으로 돌아가기</button>`;
+    return `<span class="dialog-eyebrow">수호자 진화 도감</span><h2 id="dialog-title">작은 수호자에서, 전장의 전설로</h2><p class="dialog-description">숫자는 등급 진화 단계입니다. 같은 수호자 3명을 합성하면 다음 등급으로 진화합니다. 유니크는 별도의 레벨과 스킬 진화도 성장합니다.</p>${TOWER_TYPES.map(type => `<section class="evolution-gallery"><h3>${TOWER_LABELS[type]}</h3><div class="evolution-gallery-grid">${LADDER.map((r, i) => `<article>${unitArtMarkup(getUnitDefinition(`${r.id}-${roles[type]}`))}<b style="color:${r.color}">${i + 1}단계 · ${r.label}</b></article>`).join('')}</div><div class="awakening-preview">${unitArtMarkup(getUnitDefinition(`super-${type}`))}<div><small>별도 조합 · 최종 각성</small><h4>${getUnitDefinition(`super-${type}`).name}</h4><p>같은 유형 유니크 1 + 전설 ${SUPER_INGREDIENT_COUNT} + 신화 ${SUPER_INGREDIENT_COUNT} + 초월 ${SUPER_INGREDIENT_COUNT} + 불멸 ${SUPER_INGREDIENT_COUNT} + ${SUPER_COST.toLocaleString()}G</p></div></div></section>`).join('')}<section class="awakening-preview ultimate-preview">${unitArtMarkup(getUnitDefinition(ULTIMATE_ID))}<div><small>사신 합일 · 궁극 각성</small><h4>무극신</h4><p>슈퍼유니크 4종 + 20,000G</p>${ULTIMATE_SKILLS.map(s=>`<p><b>${s.name}</b> · ${s.description}</p>`).join('')}</div></section><button data-close class="dialog-primary">전장으로 돌아가기</button>`;
 }

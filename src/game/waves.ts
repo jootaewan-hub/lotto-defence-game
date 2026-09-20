@@ -67,16 +67,29 @@ export const DIFFICULTY_WAVE_OFFSET = MAX_WAVES;
 const DIFFICULTY_STAT_STEP = 1.5;
 const DIFFICULTY_SPEED_STEP = 1.15;
 
-const difficultyStats = (rank: number) => ({
-  waveOffset: DIFFICULTY_WAVE_OFFSET * rank,
-  statMultiplier: Number(Math.pow(DIFFICULTY_STAT_STEP, rank).toFixed(4)),
-  speedMultiplier: Number(Math.pow(DIFFICULTY_SPEED_STEP, rank).toFixed(4)),
-});
+/** Armor takes half the difficulty's increase: it multiplies damage down, so the
+ *  full step stacked with the health curve left late Insane at a 91% cut. */
+const DIFFICULTY_ARMOR_SHARE = 0.5;
+/** Killing is far harder past 보통, so a kill there is worth more. */
+const DIFFICULTY_GOLD_STEP = 2;
+
+const difficultyStats = (rank: number) => {
+  const statMultiplier = Number(Math.pow(DIFFICULTY_STAT_STEP, rank).toFixed(4));
+  return {
+    waveOffset: DIFFICULTY_WAVE_OFFSET * rank,
+    statMultiplier,
+    armorMultiplier: Number((1 + (statMultiplier - 1) * DIFFICULTY_ARMOR_SHARE).toFixed(4)),
+    goldMultiplier: rank === 0 ? 1 : DIFFICULTY_GOLD_STEP,
+    speedMultiplier: Number(Math.pow(DIFFICULTY_SPEED_STEP, rank).toFixed(4)),
+  };
+};
 
 export const DIFFICULTIES: Record<RunState['difficulty'], {
   label: string;
   waveOffset: number;
   statMultiplier: number;
+  armorMultiplier: number;
+  goldMultiplier: number;
   speedMultiplier: number;
   spawnMultiplier: number;
   next: RunState['difficulty'] | null;
