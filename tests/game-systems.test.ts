@@ -333,7 +333,7 @@ describe("lotto defence game systems", () => {
     expect(simulation.state.board.every(isOnTowerFieldEdge)).toBe(true);
   });
 
-  test("auto sort groups matching units on the square edge with unique units first", () => {
+  test("auto sort groups matching units on the square edge by class", () => {
     const simulation = new GameSimulation(createDefaultMetaProgress(), createSeededRng(11));
     const commonKnight = UNIT_DEFINITIONS.find((unit) => unit.id === "common-single")!;
     const advancedMage = UNIT_DEFINITIONS.find((unit) => unit.id === "advanced-area")!;
@@ -355,14 +355,14 @@ describe("lotto defence game systems", () => {
     expect(simulation.state.board.map((unit) => unit.definitionId)).toEqual([
       uniqueRanger.id,
       uniqueRanger.id,
+      commonKnight.id,
+      commonKnight.id,
       advancedMage.id,
-      commonKnight.id,
-      commonKnight.id,
     ]);
     expect(simulation.state.board.every(isOnTowerFieldEdge)).toBe(true);
     expect(simulation.state.board.find((unit) => unit.instanceId === firstCommon.instanceId)?.cooldownMs).toBe(420);
     expect(simulation.drainEvents()).toContainEqual(
-      expect.objectContaining({ type: "message", text: expect.stringContaining("같은 종류") }),
+      expect.objectContaining({ type: "message", text: expect.stringContaining("궁수·전사") }),
     );
   });
 

@@ -2343,3 +2343,91 @@ dialog h2 {
 #auto-progress[aria-pressed="true"] {color:#b8f1ce;border-color:#69b88a;}
 #merge-rarity {background:#142830;color:#ebd49e;border:1px solid #68766b;border-radius:6px;padding:6px;}
 .battle-toolbar,.roster-tools {flex-wrap:wrap;gap:6px;}
+
+/* The controls need their own height when the second row wraps. */
+.battle-toolbar {height:auto;min-height:62px;}
+@media(min-width:801px) {
+  .shell {width:min(1400px,calc(100% - 48px),calc((100vh - 390px) * 78 / 50 + 330px));}
+  .battle-toolbar {
+    display:grid;
+    grid-template-columns:minmax(0,1fr) auto auto;
+    grid-template-areas:"speed kills start" "auto auto auto";
+    align-items:center;
+    min-height:78px;
+    padding:7px 12px;
+    column-gap:8px;
+    row-gap:3px;
+  }
+  .speed-controls {grid-area:speed;min-width:0;}
+  .speed-button {padding:5px 7px;}
+  .auto-toggles {grid-area:auto;justify-content:center;}
+  .kill-count {grid-area:kills;margin-left:0;}
+  .wave-button {grid-area:start;margin-left:0;padding:7px 10px;}
+}
+
+/* Keep transient combat notices away from the middle of the battlefield. */
+.toast {
+  left:auto;
+  right:10px;
+  bottom:10px;
+  max-width:min(44%,240px);
+  padding:7px 10px;
+  font-size:10px;
+  text-align:right;
+  transform:translateY(8px);
+}
+.toast.show {transform:translateY(0);}
+.auto-all {border-color:#7fe3c05c;color:#d7e8d8;font-weight:600;}
+
+@media(max-width:450px) {
+  .speed-controls {justify-content:space-between;gap:0;}
+  .speed-button {padding:5px 6px;}
+  .speed-button.operator-speed small {display:none;}
+}
+
+/* More room for placing towers while keeping the primary controls visible. */
+@media(min-width:801px) {
+  .masthead {height:64px;}
+  .campaign-heading {padding:9px 0 13px;}
+  .chapter-label {margin-bottom:5px;}
+  .campaign-heading p {margin-top:5px;}
+  .shell {width:min(1400px,calc(100% - 48px),calc((100vh - 350px) * 78 / 50 + 330px));}
+}
+
+@media(max-width:600px) {
+  .roster-tools {
+    align-self:stretch;
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:6px;
+    white-space:normal;
+  }
+  .roster-tools button,.roster-tools select {
+    width:100%;
+    min-height:34px;
+    font-size:11px;
+  }
+  .roster-tools button {padding:6px 5px;}
+}
+
+.roster-tools button:disabled {opacity:.64;}
+
+.battle-hud {position:relative;height:88px;padding-bottom:22px;}
+.dps-metrics {
+  position:absolute;
+  right:18px;
+  bottom:4px;
+  display:flex;
+  gap:12px;
+  color:#a9c5ba;
+  font-size:9px;
+  font-variant-numeric:tabular-nums;
+  white-space:nowrap;
+}
+.dps-metrics b {color:#d6e8cb;font-weight:600;}
+.dps-metrics.low #dps-current {color:#e5a39a;}
+.unit-card .card-dps {color:#b6ddbd;font-size:9px;font-weight:600;}
+@media(max-width:600px) {
+  .battle-hud {height:88px;padding-bottom:25px;}
+  .dps-metrics {left:9px;right:9px;justify-content:center;gap:10px;font-size:9px;}
+}

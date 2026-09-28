@@ -22,6 +22,8 @@ if errorlevel 1 goto install_error
 echo.
 echo 달빛 수호대를 실행합니다. 브라우저가 자동으로 열립니다.
 echo 게임을 하는 동안 이 창을 열어 두세요. 종료하려면 이 창을 닫으세요.
+echo 이미 같은 포트를 쓰는 서버가 있으면 5174 등 다른 번호로 열릴 수 있습니다.
+echo 브라우저가 보이지 않으면 아래 Local: 주소를 확인하세요.
 echo.
 call npm.cmd run dev -- --open
 if errorlevel 1 goto launch_error

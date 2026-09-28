@@ -9,6 +9,19 @@ const baseUnique: Record<TowerType, string> = { archer: 'mythic-ranger', warrior
 function ingredients(type: TowerType): UnitInstance[] { const role = type === 'archer' ? 'archer' : type === 'warrior' ? 'single' : type === 'mage' ? 'area' : 'support'; return [baseUnique[type], ...['legendary', 'mythic', 'transcendent', 'immortal'].flatMap(r => Array(SUPER_INGREDIENT_COUNT).fill(`${r}-${role}`))].map((definitionId, i) => ({ instanceId: `u${i}`, definitionId, x: 120 + i * 8, y: 148, cooldownMs: 0, attackUpgradePercent: 2, speedUpgradePercent: 1, upgradeCount: 1 })); }
 function enemy(id: string, progress: number, isBoss = false): EnemyState { return { id, wave: 1, variantId: 'grunt', variantLabel: 'test', variantTint: 0xffffff, variantTier: 0, hp: 1e9, maxHp: 1e9, armor: 0, effects: [], progress, speed: 0, rewardGold: 0, isBoss }; }
 describe('super-unique towers and dragon equipment', () => {
+    test('each feeder rarity needs three towers of the same type', () => {
+        expect(SUPER_INGREDIENT_COUNT).toBe(3);
+        const sim = game();
+        sim.state.gold = SUPER_COST;
+        const full = ingredients('warrior');
+        for (const rarity of ['legendary', 'mythic', 'transcendent', 'immortal']) {
+            sim.state.board = full.filter((unit) => unit.definitionId !== `${rarity}-single`).concat(full.filter((unit) => unit.definitionId === `${rarity}-single`).slice(0, 2));
+            expect(sim.getSuperRecipe('warrior').ready).toBe(false);
+            expect(sim.craftSuper('warrior')).toBe(false);
+        }
+        sim.state.board = full;
+        expect(sim.getSuperRecipe('warrior').ready).toBe(true);
+    });
     test('rare units cannot replace immortal ingredients and are preserved on crafting', () => {
         const sim = game();
         const recipe = ingredients('warrior');

@@ -56,7 +56,7 @@ export function getEnemyGrowthWave(wave: number): number {
  * last wave and stepping up dropped the enemy to about a eightieth of what had
  * just been beaten. Each difficulty now continues the curve where the previous
  * one ended, by offsetting the wave its health and armor scale from, and adds
- * half again on top. Its first wave is therefore about 1.5x the last wave of
+ * a 25% step on top. Its first wave is therefore about 1.25x the last wave of
  * the difficulty before it.
  *
  * Movement speed does not follow the offset. The curve would make Insane
@@ -64,8 +64,8 @@ export function getEnemyGrowthWave(wave: number): number {
  * takes a gentler step per difficulty.
  */
 export const DIFFICULTY_WAVE_OFFSET = MAX_WAVES;
-const DIFFICULTY_STAT_STEP = 1.5;
-const DIFFICULTY_SPEED_STEP = 1.15;
+const DIFFICULTY_STAT_STEP = 1.25;
+const DIFFICULTY_SPEED_STEP = 1.075;
 
 /** Armor takes half the difficulty's increase: it multiplies damage down, so the
  *  full step stacked with the health curve left late Insane at a 91% cut. */

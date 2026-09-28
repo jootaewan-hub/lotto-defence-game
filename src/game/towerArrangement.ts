@@ -1,7 +1,16 @@
 import { TOWER_FIELD, TOWER_RADIUS } from "./geometry";
 import { getRarityIndex } from "./rarities";
-import { getUnitDefinition } from "./units";
+import { getTowerType, getUnitDefinition } from "./units";
 import type { RunState } from "./types";
+
+const TYPE_ORDER = ['archer','warrior','mage','priest'] as const;
+
+export function compareUnitsForRoster(left: RunState['board'][number], right: RunState['board'][number]): number {
+  const a = getUnitDefinition(left.definitionId);
+  const b = getUnitDefinition(right.definitionId);
+  const rank = (unit: typeof a) => unit.ultimate ? 12 : unit.superUnique ? 11 : getRarityIndex(unit.rarity);
+  return rank(b) - rank(a) || TYPE_ORDER.indexOf(getTowerType(a)) - TYPE_ORDER.indexOf(getTowerType(b)) || a.id.localeCompare(b.id);
+}
 
 export function compareUnitsForArrangement(
   left: RunState["board"][number],
@@ -9,16 +18,11 @@ export function compareUnitsForArrangement(
 ): number {
   const leftDefinition = getUnitDefinition(left.definitionId);
   const rightDefinition = getUnitDefinition(right.definitionId);
-  const uniqueOrder = Number(Boolean(rightDefinition.uniqueAbility)) - Number(Boolean(leftDefinition.uniqueAbility));
-  if (uniqueOrder !== 0) {
-    return uniqueOrder;
+  const typeOrder = TYPE_ORDER.indexOf(getTowerType(leftDefinition)) - TYPE_ORDER.indexOf(getTowerType(rightDefinition));
+  if (typeOrder !== 0) {
+    return typeOrder;
   }
-
-  const rarityOrder = getRarityIndex(rightDefinition.rarity) - getRarityIndex(leftDefinition.rarity);
-  if (rarityOrder !== 0) {
-    return rarityOrder;
-  }
-  return left.definitionId.localeCompare(right.definitionId);
+  return compareUnitsForRoster(left, right);
 }
 
 export function createTowerEdgeCandidates(count: number): Array<{ x: number; y: number }> {

@@ -48,6 +48,7 @@ import { getTrueBossDefinition } from "./enemyVariants";
 import { getWaveCleanupWindowMs } from "./combatMath";
 export { getEnemyExperienceReward } from "./combatMath";
 import { compareUnitsForArrangement, createTowerEdgeCandidates } from "./towerArrangement";
+import { getExpectedTowerDps, getRecommendedDps } from './dps';
 import { attackEnemies, moveEnemies, spawnEnemies, tickBuffs, tickEnemyEffects } from "./combat";
 
 export interface MergePrompt {
@@ -165,12 +166,20 @@ export class GameSimulation {
   rewardChoices: RewardDefinition[] = [];
   pendingRoll: UpgradeRoll | null = null;
   rewardHistory: UpgradeRoll[] = [];
-  /**
-   * The gold roulette upgrades the whole guard, not the tower you spent on, so
-   * one roll is worth the same whichever grade you pick to pay with.
-   */
-  towerAttackUpgradePercent = 0;
-  towerSpeedUpgradePercent = 0;
+  /** Gold roulette bonuses are shared by all towers of the payer's type. */
+  towerTypeUpgrades: Record<TowerType, { attack: number; haste: number }> = {
+    archer: { attack: 0, haste: 0 }, warrior: { attack: 0, haste: 0 },
+    mage: { attack: 0, haste: 0 }, priest: { attack: 0, haste: 0 },
+  };
+  getTowerTypeUpgrade(type: TowerType, stat: 'attack' | 'haste'): number {
+    return this.towerTypeUpgrades[type][stat];
+  }
+  get towerAttackUpgradePercent(): number {
+    return TOWER_TYPES.reduce((sum, type) => sum + this.towerTypeUpgrades[type].attack, 0);
+  }
+  get towerSpeedUpgradePercent(): number {
+    return TOWER_TYPES.reduce((sum, type) => sum + this.towerTypeUpgrades[type].haste, 0);
+  }
 
   getUpgradeValue(stat: UpgradeStat): number { return this.upgrades[stat] ?? 0; }
   /** 내부 전용. combat.ts가 CombatContext로 접근하므로 private이 아니다. 소비자 API는 아니다. */
@@ -282,11 +291,27 @@ export class GameSimulation {
     const roleStat = definition.role === 'single' ? 'singleDamage' : definition.role === 'area' ? 'areaDamage' : 'supportDamage';
     return { ...stats,
       baseAttack: definition.attack,
-      attack: (stats.attack + equipmentAttack) * (1 + ((unit.attackUpgradePercent ?? 0) + this.towerAttackUpgradePercent) / 100) * (1 + getSkillEffectTotal(this.meta, 'attackBonus') + this.expeditionAttackBonus + (shared?.formation??this.formationBonus)) * (1 + this.bonus(roleStat)) * aura * berserk,
-      attackSpeed: Math.max(35, stats.attackSpeed / ((1 + this.bonus('haste') + ((unit.speedUpgradePercent??0) + this.towerSpeedUpgradePercent)/100 + (boots?boots.bonus+(boots.waveSpeedPercent??0):0)/100) * aura * berserk)),
+      attack: (stats.attack + equipmentAttack) * (1 + ((unit.attackUpgradePercent ?? 0) + this.getTowerTypeUpgrade(getTowerType(definition), 'attack')) / 100) * (1 + getSkillEffectTotal(this.meta, 'attackBonus') + this.expeditionAttackBonus + (shared?.formation??this.formationBonus)) * (1 + this.bonus(roleStat)) * aura * berserk,
+      attackSpeed: Math.max(35, stats.attackSpeed / ((1 + this.bonus('haste') + ((unit.speedUpgradePercent??0) + this.getTowerTypeUpgrade(getTowerType(definition), 'haste'))/100 + (boots?boots.bonus+(boots.waveSpeedPercent??0):0)/100) * aura * berserk)),
       range: stats.range * (1 + this.bonus('range')),
       criticalChance: Math.min(0.85, stats.criticalChance + this.bonus('criticalChance')),
     };
+  }
+
+  getTowerDps(slot: number): number {
+    const stats = this.getTowerCombatStats(slot);
+    if (!stats) return 0;
+    const criticalChance = Math.min(0.85, stats.criticalChance + getSkillEffectTotal(this.meta, 'criticalChanceBonus'));
+    return getExpectedTowerDps({ ...stats, criticalChance }, 1.75 + this.bonus('criticalDamage'));
+  }
+
+  getCurrentDps(): number {
+    return this.state.board.reduce((sum, _, index) => sum + this.getTowerDps(index), 0);
+  }
+
+  getRecommendedDps(): number {
+    const wave = this.activeWaveDefinition ?? this.upcomingWaveDefinition;
+    return wave ? getRecommendedDps(wave, this.difficulty) : 0;
   }
 
   getTowerUpgradeCost(slot: number): number {
@@ -301,7 +326,7 @@ export class GameSimulation {
     if (this.state.gold < cost) return null;
     const value = rollNormalInteger(this.rng, 0.2, 5);
     this.state.gold -= cost;
-    this.pendingRoll = {kind: 'tower', title: getUnitDefinition(unit.definitionId).name, label: stat==='attack'?'타워 공격력':'타워 공격속도', stat, value, min: 0.2, max: 5, unit: '%', towerId: unit.instanceId, cost};
+    this.pendingRoll = {kind: 'tower', title: getUnitDefinition(unit.definitionId).name, label: stat==='attack'?'공격력':'공격속도', stat, value, min: 0.2, max: 5, unit: '%', towerId: unit.instanceId, cost};
     return this.pendingRoll;
   }
 
@@ -322,8 +347,9 @@ export class GameSimulation {
     if (roll.kind === 'tower') {
       const unit = this.state.board.find(u => u.instanceId === roll.towerId);
       if (!unit) { this.state.gold += roll.cost ?? 0; this.pendingRoll = null; return false; }
-      if (roll.stat === 'haste') this.towerSpeedUpgradePercent = Math.round((this.towerSpeedUpgradePercent + roll.value) * 100) / 100;
-      else this.towerAttackUpgradePercent = Math.round((this.towerAttackUpgradePercent + roll.value) * 100) / 100;
+      const bonuses = this.towerTypeUpgrades[getTowerType(getUnitDefinition(unit.definitionId))];
+      if (roll.stat === 'haste') bonuses.haste = Math.round((bonuses.haste + roll.value) * 100) / 100;
+      else bonuses.attack = Math.round((bonuses.attack + roll.value) * 100) / 100;
       unit.upgradeCount = (unit.upgradeCount ?? 0) + 1;
       unit.upgradeGoldSpent = (unit.upgradeGoldSpent ?? 0) + (roll.cost ?? 0);
     } else {
@@ -390,6 +416,7 @@ export class GameSimulation {
     this.rewardChoices = [];
     this.pendingRoll = null;
     this.rewardHistory = [];
+    for (const type of TOWER_TYPES) this.towerTypeUpgrades[type] = { attack: 0, haste: 0 };
     this.frostCooldownMs = 0;
     this.combatCounters.enemySequence = 0;
     this.combatCounters.attackSequence = 0;
@@ -669,7 +696,8 @@ export class GameSimulation {
     const slot = this.cheapestUpgradeSlot();
     if (slot < 0) return;
     // keep the two bonuses level rather than pouring everything into one
-    const stat = this.towerAttackUpgradePercent <= this.towerSpeedUpgradePercent ? "attack" : "haste";
+    const type = getTowerType(getUnitDefinition(this.state.board[slot]!.definitionId));
+    const stat = this.getTowerTypeUpgrade(type, 'attack') <= this.getTowerTypeUpgrade(type, 'haste') ? "attack" : "haste";
     if (this.rollTowerUpgrade(slot, stat)) this.resolveUpgradeRoll();
   }
 
@@ -767,8 +795,37 @@ export class GameSimulation {
       ...this.state,
       board: board.map((unit, index) => ({ ...unit, ...positions[index]! })),
     };
-    if (announce) this.events.push({ type: "message", text: "유니크 우선으로 같은 종류끼리 정렬했어요." });
+    if (announce) this.events.push({ type: "message", text: "궁수·전사·마법사·사제별로 모았어요." });
     return true;
+  }
+
+  getMergeableGroupCount(rarity: RarityId): number {
+    return this.getMergeableGroups().filter(group => getUnitDefinition(this.state.board[group[0]!]!.definitionId).rarity === rarity).length;
+  }
+
+  getSellableCount(rarity: RarityId): number {
+    return this.state.board.filter(unit => {
+      const definition = getUnitDefinition(unit.definitionId);
+      return definition.rarity === rarity && !definition.superUnique;
+    }).length;
+  }
+
+  sellUnitsByRarity(rarity: RarityId): number {
+    if (!this.canManageTowers()) return 0;
+    const sold = this.state.board.filter(unit => {
+      const definition = getUnitDefinition(unit.definitionId);
+      return definition.rarity === rarity && !definition.superUnique;
+    });
+    if (sold.length === 0) return 0;
+    const ids = new Set(sold.map(unit => unit.instanceId));
+    const refund = sold.reduce((sum, unit) => sum + this.getSaleRefund(unit), 0);
+    this.state = { ...this.state, board: this.state.board.filter(unit => !ids.has(unit.instanceId)), gold: this.state.gold + refund };
+    this.events.push({ type: 'message', text: `${getRarity(rarity).label} ${sold.length}기 일괄판매 +${refund}G` });
+    return sold.length;
+  }
+
+  private getSaleRefund(unit: UnitInstance): number {
+    return 10 + getRarityIndex(getUnitDefinition(unit.definitionId).rarity) * 7 + Math.floor((unit.upgradeGoldSpent ?? 0) * 0.5);
   }
 
   sellUnit(slot: number): boolean {
@@ -778,7 +835,7 @@ export class GameSimulation {
       return false;
     }
     const definition = getUnitDefinition(unit.definitionId);
-    const refund = 10 + getRarityIndex(definition.rarity) * 7 + Math.floor((unit.upgradeGoldSpent ?? 0) * 0.5);
+    const refund = this.getSaleRefund(unit);
     const board = [...this.state.board];
     board.splice(slot, 1);
     this.state = { ...this.state, board, gold: this.state.gold + refund };

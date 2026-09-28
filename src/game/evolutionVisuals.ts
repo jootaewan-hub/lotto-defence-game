@@ -10,7 +10,7 @@ export function getEvolutionVisual(unit: UnitDefinition, level = 1, boardCount =
         stage,
         skillStage,
         label: unit.ultimate ? '궁극 각성' : unit.superUnique ? '최종 각성' : `진화 ${stage}단계`,
-        badge: unit.ultimate ? '∞' : unit.superUnique ? '★' : String(stage),
+        badge: unit.ultimate ? '∞' : unit.superUnique ? '★' : unit.rarity === 'unique' ? 'U' : String(stage),
         size: unit.ultimate ? 128 + skillStage * .4 : unit.superUnique ? 91 + skillStage * .45 : (43 + (stage - 1) * 3.8 + skillStage * .35) * crowdScale,
         ornaments: unit.superUnique ? 10 : stage - 1,
         rings: stage >= 7 ? 3 : stage >= 4 ? 2 : 1,

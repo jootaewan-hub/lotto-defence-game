@@ -1,7 +1,7 @@
 import { MAX_TOWERS } from '../src/game/superUnits';
 import { describe, expect, test } from 'vitest';
 import { REWARD_POOL, rollNormalInteger, sampleRewards } from '../src/game/upgrades';
-import { getUnitDefinition } from '../src/game/units';
+import { getTowerType, getUnitDefinition } from '../src/game/units';
 import { createSeededRng, createDefaultMetaProgress } from '../src/game/systems';
 import { GameSimulation } from '../src/game/simulation';
 const game = (seed = 21) => new GameSimulation(createDefaultMetaProgress(), createSeededRng(seed));
@@ -107,29 +107,31 @@ describe('random blessings and gold forging', () => {
         expect(sim.state.wave).toBe(10);
         expect(sim.isBossStageActive).toBe(true);
     });
-    test('a gold roulette paid on one tower raises the whole guard', () => {
+    test('a gold roulette raises only the payer’s tower type', () => {
         const sim = game();
         sim.state.gold = 100000;
         for (let i = 0; i < MAX_TOWERS; i++)
             sim.summonToFirstEmpty();
-        // a tower of a different grade to the one paying, to prove it is not per-tower
-        const other = sim.state.board.findIndex((u, i) => i > 0 && getUnitDefinition(u.definitionId).rarity !== getUnitDefinition(sim.state.board[0]!.definitionId).rarity);
+        const payerType = getTowerType(getUnitDefinition(sim.state.board[0]!.definitionId));
+        const other = sim.state.board.findIndex((u, i) => i > 0 && getTowerType(getUnitDefinition(u.definitionId)) !== payerType);
+        const same = sim.state.board.findIndex((u, i) => i > 0 && getTowerType(getUnitDefinition(u.definitionId)) === payerType && getUnitDefinition(u.definitionId).rarity !== getUnitDefinition(sim.state.board[0]!.definitionId).rarity);
         expect(other).toBeGreaterThan(0);
-        const before = sim.getTowerCombatStats(0)!.attack, otherBefore = sim.getTowerCombatStats(other)!.attack;
+        expect(same).toBeGreaterThan(0);
+        const before = sim.getTowerCombatStats(0)!.attack, otherBefore = sim.getTowerCombatStats(other)!.attack, sameBefore = sim.getTowerCombatStats(same)!.attack;
         const gold = sim.state.gold, cost = sim.getTowerUpgradeCost(0);
         const roll = sim.rollTowerUpgrade(0)!;
-        expect(roll.value).toBeGreaterThanOrEqual(1);
-        expect(roll.value).toBeLessThanOrEqual(20);
+        expect(roll.value).toBeGreaterThanOrEqual(0.2);
+        expect(roll.value).toBeLessThanOrEqual(5);
         expect(sim.state.gold).toBe(gold - cost);
         expect(sim.rollTowerUpgrade(0)).toBeNull();
         expect(sim.sellUnit(0)).toBe(false);
         expect(sim.resolveUpgradeRoll()).toBe(true);
 
         expect(sim.towerAttackUpgradePercent).toBe(roll.value);
+        expect(sim.getTowerTypeUpgrade(payerType, 'attack')).toBe(roll.value);
         expect(sim.getTowerCombatStats(0)!.attack).toBeGreaterThan(before);
-        // the tower that did not pay gains exactly as much, proportionally
-        expect(sim.getTowerCombatStats(other)!.attack).toBeGreaterThan(otherBefore);
-        expect(sim.getTowerCombatStats(other)!.attack / otherBefore).toBeCloseTo(sim.getTowerCombatStats(0)!.attack / before, 5);
+        expect(sim.getTowerCombatStats(same)!.attack / sameBefore).toBeCloseTo(sim.getTowerCombatStats(0)!.attack / before, 5);
+        expect(sim.getTowerCombatStats(other)!.attack).toBe(otherBefore);
         // the roulette no longer writes to the tower that paid
         expect(sim.state.board[0]!.attackUpgradePercent ?? 0).toBe(0);
 

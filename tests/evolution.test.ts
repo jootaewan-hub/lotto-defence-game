@@ -28,6 +28,7 @@ test('unique level evolution gains size and effects within bounded limits', () =
   expect(master.size).toBeGreaterThan(novice.size);
   expect(master.skillStage).toBe(20);
   expect(master.particles).toBeLessThanOrEqual(8);
+  expect(novice.badge).toBe('U');
 });
 
 test.each(['archer','single','area','support'])('%s changes equipment silhouette at epic and mythic tiers', role => {

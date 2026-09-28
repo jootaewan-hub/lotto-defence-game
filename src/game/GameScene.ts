@@ -256,10 +256,10 @@ export class GameScene extends Phaser.Scene {
             const size = visual.size;
             let badge = this.stageLabels.get(u.instanceId);
             if (!badge) {
-                badge = this.add.text(p.x, p.y + 19, visual.badge, { fontFamily: 'sans-serif', fontSize: '10px', fontStyle: 'bold', color: def.superUnique ? '#ffdf8a' : rarity.color, backgroundColor: '#10212c', padding: { x: 3, y: 1 } }).setOrigin(.5).setDepth(7);
+                badge = this.add.text(p.x, p.y + 17, visual.badge, { fontFamily: 'sans-serif', fontSize: '8px', fontStyle: 'bold', color: def.superUnique ? '#ffdf8a' : rarity.color, backgroundColor: '#10212c', padding: { x: 1, y: 0 } }).setOrigin(.5).setDepth(7);
                 this.stageLabels.set(u.instanceId, badge);
             }
-            badge.setPosition(p.x, p.y + 19);
+            badge.setPosition(p.x, p.y + 17);
             if (badge.text !== visual.badge) badge.setText(visual.badge);
             this.combat.applyPose(u.instanceId, img, p, size, this.reduced || !step ? 0 : Math.sin(time / 440 + i) * 1.2);
         });

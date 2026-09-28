@@ -79,7 +79,7 @@ test.each([1, 5, 10, 120])('each difficulty is strictly harder than the last at 
   }
 });
 
-test('a campaign picks up where the last one ended, half again as hard', () => {
+test('a campaign picks up where the last one ended with a 25 percent step', () => {
   // Measured on the curve, not on a spawned enemy: wave 1 rolls a grunt variant
   // and wave 120 rolls a tier-five one, so spawned health compares two things.
   const curve = (difficulty: typeof DIFFICULTIES_IN_ORDER[number], wave: number) => {
@@ -91,15 +91,15 @@ test('a campaign picks up where the last one ended, half again as hard', () => {
   for (let i = 1; i < DIFFICULTIES_IN_ORDER.length; i += 1) {
     const previousLast = curve(DIFFICULTIES_IN_ORDER[i - 1]!, MAX_WAVES);
     const firstWave = curve(DIFFICULTIES_IN_ORDER[i]!, 1);
-    expect(firstWave / previousLast).toBeGreaterThan(1.45);
-    expect(firstWave / previousLast).toBeLessThan(1.6);
+    expect(firstWave / previousLast).toBeGreaterThan(1.2);
+    expect(firstWave / previousLast).toBeLessThan(1.35);
   }
 });
 
 test('movement speed steps gently so late enemies stay answerable', () => {
   const speeds = DIFFICULTIES_IN_ORDER.map(d => spawnAt(d, 1)[0]!.speed);
   for (let i = 1; i < speeds.length; i += 1) {
-    expect(speeds[i]! / speeds[i - 1]!).toBeCloseTo(1.15, 2);
+    expect(speeds[i]! / speeds[i - 1]!).toBeCloseTo(1.075, 2);
   }
   // the whole ladder stays well under double, unlike the health curve
   expect(speeds[3]! / speeds[0]!).toBeLessThan(2);
