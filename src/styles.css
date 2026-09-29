@@ -1592,11 +1592,7 @@ dialog h2 {
   gap: 4px;
 }
 .speed-button.operator-speed small {
-  font-size: 8px;
-  line-height: 1;
-  border: 1px solid #d7adbf44;
-  padding: 3px;
-  border-radius: 3px;
+  display: none;
 }
 .speed-button.operator-speed.active {
   background: #9d527332;

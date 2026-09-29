@@ -16,7 +16,7 @@ export function getUniqueAbilityStats(ability: UnitAbilityKind, level: number): 
       ability,
       stage,
       targetCount: Math.min(5, 3 + Math.floor(step / 7)),
-      damageMultiplier: 1 + step * 0.015,
+      damageMultiplier: 0.9 * (1 + step * 0.015),
     };
   }
   if (ability === "poison") {

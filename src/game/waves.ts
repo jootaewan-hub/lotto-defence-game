@@ -38,6 +38,11 @@ const MID_BOSS_BASE_HEALTH = 5.6;
 const MID_BOSS_HEALTH_PER_TIER = 0.95;
 const BOSS_HEALTH_MULTIPLIER = 1.5;
 const TRUE_BOSS_HEALTH_MULTIPLIER = 1.15;
+/** Boss stages must demand more sustained DPS than the ordinary wave they follow. */
+const BOSS_CHALLENGE_MULTIPLIER: Record<Exclude<StageKind, 'normal'>, number> = {
+  mid: 2.7, named: 5.8, true: 6.4, final: 3.2,
+};
+const BOSS_CAMPAIGN_GROWTH = 1.8;
 
 /**
  * After the late game wave, health and armor advance at half the former pace.
@@ -127,7 +132,8 @@ function createStage(number: number, kind: StageKind, waveOffset = 0): WaveDefin
     bossId: kind === "named" ? getNamedBossId(number) : undefined,
     trueBossId: isFinalBoss ? FINAL_BOSS_ID : kind === "true" ? getTrueBossId(number) : undefined,
     enemyCount: isNamedBoss ? 1 : isBoss ? MID_BOSS_COUNT : 10 + tier * 2 + (number % 5),
-    healthMultiplier: baseHealthMultiplier * lateGameHealthMultiplier,
+    healthMultiplier: baseHealthMultiplier * lateGameHealthMultiplier *
+      (isBoss ? BOSS_CHALLENGE_MULTIPLIER[kind] * BOSS_CAMPAIGN_GROWTH ** Math.max(0, Math.round(waveOffset / MAX_WAVES)) : 1),
     speedMultiplier: isNamedBoss ? 0.7 + tier * 0.01 : isBoss ? 0.75 + tier * 0.015 : 1 + tier * 0.0175,
     durationMs: isFinalBoss
       ? FINAL_BOSS_DURATION_MS

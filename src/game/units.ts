@@ -53,7 +53,7 @@ export const UNIT_DEFINITIONS: UnitDefinition[] = RARITIES.filter((rarity) => ra
     attackSpeed: 215,
     criticalChance: 0.24,
     range: 154,
-    skill: "최대 5명의 적을 공격하며 5레벨마다 연사 위력 상승",
+    skill: "각 대상에게 공격력 0.9배, 최대 5명 동시 공격. 5레벨마다 연사 위력 상승",
   },
   {
     id: "mythic-plague-warlock",
@@ -110,7 +110,7 @@ export const UNIT_DEFINITIONS: UnitDefinition[] = RARITIES.filter((rarity) => ra
 ]);
 
 export const SUPER_SKILLS: Record<TowerType, string> = {
-  archer: '천궁 오연사: 적 5명 동시 타격, 타격 피해 25%, 보스 피해 5배',
+  archer: '천궁 연사: 적 5명 동시 타격, 레벨 20마다 1명 증가해 최대 10명. 각 대상 피해 1.1배, 보스 피해 5배',
   warrior: '검성검기: 적 5명 동시 타격, 타격 피해 25%, 보스 피해 5배',
   mage: '종말의 화염: 공격마다 맵 전체 적에게 공격력 25% 화염 피해',
   priest: '천상의 축복: 모든 타워 공격력·공격속도 +7.5%, 10초 유지 후 5초 대기',

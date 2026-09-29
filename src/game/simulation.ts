@@ -1,4 +1,4 @@
-import { MAX_TOWERS, MAX_ITEM_UPGRADE_LEVEL, SUPER_COST, SUPER_INGREDIENT_COUNT, SUPER_FEEDER_RARITIES, TOWER_TYPES, DRAGON_ITEMS, getSuperRecipe, getItemUpgradeChance, getItemUpgradeCost } from './superUnits';
+import { MAX_TOWERS, MAX_ITEM_UPGRADE_LEVEL, SUPER_COST, SUPER_INGREDIENT_COUNT, SUPER_FEEDER_RARITIES, TOWER_TYPES, DRAGON_ITEMS, getSuperRecipe, getItemUpgradeChance, getItemUpgradeCost, getDragonWeaponAttackBonus, getDragonRingDamageGain } from './superUnits';
 import { DIFFICULTIES } from './waves';
 import { ULTIMATE_ID, ULTIMATE_COST, getUltimateRecipe } from './ultimate';
 import { rollNormalInteger, sampleRewards, type ExpeditionUpgrades, type RewardDefinition, type UpgradeRoll, type UpgradeStat } from './upgrades';
@@ -47,7 +47,7 @@ import {
 import { getTrueBossDefinition } from "./enemyVariants";
 import { getWaveCleanupWindowMs } from "./combatMath";
 export { getEnemyExperienceReward } from "./combatMath";
-import { compareUnitsForArrangement, createTowerEdgeCandidates } from "./towerArrangement";
+import { compareUnitsForArrangement, createTowerArrangementPositions, createTowerEdgeCandidates } from "./towerArrangement";
 import { getExpectedTowerDps, getRecommendedDps } from './dps';
 import { getActiveSynergies } from './synergies';
 import { attackEnemies, moveEnemies, spawnEnemies, tickBuffs, tickEnemyEffects } from "./combat";
@@ -162,7 +162,7 @@ export class GameSimulation {
   private autoActionCooldownMs = 0;
   /** Summoning and upgrading compete for the same gold, so they take turns. */
   private autoPreferUpgrade = false;
-  private lastArrangedBoardSize = -1;
+  private lastArrangedBoardKey = '';
   pendingReward = false;
   upgrades: ExpeditionUpgrades = {};
   rewardChoices: RewardDefinition[] = [];
@@ -218,7 +218,6 @@ export class GameSimulation {
     const recipe = this.getUltimateRecipe();
     if (!recipe.ready) return false;
     const consumed = recipe.slots.map(i => this.state.board[i]!);
-    const anchor = consumed[0]!;
     const inherited = consumed.reduce((total, u) => ({
       attackUpgradePercent: total.attackUpgradePercent + (u.attackUpgradePercent ?? 0),
       speedUpgradePercent: total.speedUpgradePercent + (u.speedUpgradePercent ?? 0),
@@ -235,7 +234,7 @@ export class GameSimulation {
         if (item.kind === 'boots') existing.waveSpeedPercent = (existing.waveSpeedPercent ?? 0) + (item.waveSpeedPercent ?? 0);
       }
     }
-    const unit: UnitInstance = { instanceId: `unit-${++this.unitSequence}`, definitionId: ULTIMATE_ID, x: anchor.x, y: anchor.y, cooldownMs: 0, superElapsedMs: 0, ultimateCooldownMs: 0, items, ...inherited };
+    const unit: UnitInstance = { instanceId: `unit-${++this.unitSequence}`, definitionId: ULTIMATE_ID, x: TOWER_SPAWN.x, y: TOWER_SPAWN.y, cooldownMs: 0, superElapsedMs: 0, ultimateCooldownMs: 0, items, ...inherited };
     const slots = new Set(recipe.slots);
     this.state = { ...this.state, gold: this.state.gold - ULTIMATE_COST, board: [...this.state.board.filter((_, i) => !slots.has(i)), unit] };
     this.meta = registerUniqueUnitAcquisition(this.meta, ULTIMATE_ID);
@@ -249,10 +248,9 @@ export class GameSimulation {
     const recipe = this.getSuperRecipe(type);
     if (!recipe.ready) return false;
     const consumed = recipe.slots.map(i => this.state.board[i]!);
-    const anchor = consumed[0]!;
     const inherited = consumed.reduce((total,u)=>({attackUpgradePercent:total.attackUpgradePercent+(u.attackUpgradePercent??0),speedUpgradePercent:total.speedUpgradePercent+(u.speedUpgradePercent??0),upgradeCount:total.upgradeCount+(u.upgradeCount??0),upgradeGoldSpent:total.upgradeGoldSpent+(u.upgradeGoldSpent??0)}),{attackUpgradePercent:0,speedUpgradePercent:0,upgradeCount:0,upgradeGoldSpent:0});
     const ids = new Set(consumed.map(u=>u.instanceId));
-    const unit: UnitInstance = {instanceId:`unit-${++this.unitSequence}`,definitionId:`super-${type}`,x:anchor.x,y:anchor.y,cooldownMs:0,items:[],superElapsedMs:0,...inherited};
+    const unit: UnitInstance = {instanceId:`unit-${++this.unitSequence}`,definitionId:`super-${type}`,x:TOWER_SPAWN.x,y:TOWER_SPAWN.y,cooldownMs:0,items:[],superElapsedMs:0,...inherited};
     this.state = {...this.state,gold:this.state.gold-SUPER_COST,board:[...this.state.board.filter(u=>!ids.has(u.instanceId)),unit]};
     this.meta = registerUniqueUnitAcquisition(this.meta,unit.definitionId);
     this.events.push({type:'message',text:`유일슈퍼유니크 ${getUnitDefinition(unit.definitionId).name} 탄생!`});
@@ -274,7 +272,7 @@ export class GameSimulation {
     if(this.state.gold<cost)return null;
     this.state.gold-=cost;
     const success=chance===1||this.rng.next()<chance;
-    const gain=success?(kind==='weapon'?50:kind==='ring'?this.randomInteger(50,500):this.randomInteger(5,40)):0;
+    const gain=success?(kind==='weapon'?getDragonWeaponAttackBonus(level)-getDragonWeaponAttackBonus(item.level):kind==='ring'?getDragonRingDamageGain(level,this.randomInteger(50,500)):this.randomInteger(5,40)):0;
     if(success){item.level=level;item.bonus+=gain;}
     this.events.push({type:'message',text:`${DRAGON_ITEMS.find(d=>d.kind===kind)!.name} ${success?`+${item.level} 강화 성공`:'강화 실패 · 기존 강화 유지'}`});
     return {success,level:item.level,gain,cost};
@@ -721,8 +719,8 @@ export class GameSimulation {
   }
 
   private tickAutoArrange(): void {
-    if (this.state.board.length < 2 || this.state.board.length === this.lastArrangedBoardSize) return;
-    this.lastArrangedBoardSize = this.state.board.length;
+    const boardKey = this.state.board.map(unit => `${unit.instanceId}:${unit.definitionId}`).join('|');
+    if (!boardKey || boardKey === this.lastArrangedBoardKey) return;
     this.sortUnitsByType(false);
   }
 
@@ -803,18 +801,19 @@ export class GameSimulation {
 
   /** `announce` is off for auto arranging, which would otherwise toast every change. */
   sortUnitsByType(announce = true): boolean {
-    if (this.state.board.length < 2) {
+    if (this.state.board.length === 0) {
       if (announce) this.events.push({ type: "message", text: "정렬할 유닛이 더 필요해요." });
       return false;
     }
 
     const board = [...this.state.board].sort(compareUnitsForArrangement);
-    const positions = createTowerEdgeCandidates(board.length);
+    const positions = createTowerArrangementPositions(board);
     this.state = {
       ...this.state,
       board: board.map((unit, index) => ({ ...unit, ...positions[index]! })),
     };
-    if (announce) this.events.push({ type: "message", text: "궁수·전사·마법사·사제별로 모았어요." });
+    this.lastArrangedBoardKey = board.map(unit => `${unit.instanceId}:${unit.definitionId}`).join('|');
+    if (announce) this.events.push({ type: "message", text: "높은 등급은 적 출현 지점 가까이, 슈퍼유니크와 무극신은 중앙에 배치했어요." });
     return true;
   }
 

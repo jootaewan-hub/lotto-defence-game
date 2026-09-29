@@ -345,7 +345,7 @@ describe("lotto defence game systems", () => {
     expect(simulation.state.board.every(isOnTowerFieldEdge)).toBe(true);
   });
 
-  test("auto sort groups matching units on the square edge by class", () => {
+  test("auto sort places higher grades nearer the entrance on the square edge", () => {
     const simulation = new GameSimulation(createDefaultMetaProgress(), createSeededRng(11));
     const commonKnight = UNIT_DEFINITIONS.find((unit) => unit.id === "common-single")!;
     const advancedMage = UNIT_DEFINITIONS.find((unit) => unit.id === "advanced-area")!;
@@ -367,14 +367,14 @@ describe("lotto defence game systems", () => {
     expect(simulation.state.board.map((unit) => unit.definitionId)).toEqual([
       uniqueRanger.id,
       uniqueRanger.id,
+        advancedMage.id,
       commonKnight.id,
       commonKnight.id,
-      advancedMage.id,
     ]);
     expect(simulation.state.board.every(isOnTowerFieldEdge)).toBe(true);
     expect(simulation.state.board.find((unit) => unit.instanceId === firstCommon.instanceId)?.cooldownMs).toBe(420);
     expect(simulation.drainEvents()).toContainEqual(
-      expect.objectContaining({ type: "message", text: expect.stringContaining("궁수·전사") }),
+       expect.objectContaining({ type: "message", text: expect.stringContaining("적 출현 지점") }),
     );
   });
 
@@ -442,7 +442,7 @@ describe("lotto defence game systems", () => {
     }
 
     expect(getUniqueAbilityStats("multishot", 5)).toEqual(
-      expect.objectContaining({ targetCount: 3, damageMultiplier: 1.015 }),
+       expect.objectContaining({ targetCount: 3, damageMultiplier: 0.9135 }),
     );
     expect(getUniqueAbilityStats("multishot", 35)).toEqual(expect.objectContaining({ targetCount: 4 }));
     expect(getUniqueAbilityStats("multishot", 70)).toEqual(expect.objectContaining({ targetCount: 5 }));
@@ -465,11 +465,12 @@ describe("lotto defence game systems", () => {
     const simulation = new GameSimulation(createDefaultMetaProgress(), createStaticRng(1));
     const ranger = UNIT_DEFINITIONS.find((unit) => unit.id === "mythic-ranger")!;
     simulation.state = { ...simulation.state, board: [createTestUnit("ranger", ranger.id, 195, 148)] };
-    simulation.enemies.push(createTestEnemy("enemy-1", 0.08), createTestEnemy("enemy-2", 0.1), createTestEnemy("enemy-3", 0.12));
+    simulation.enemies.push(createTestEnemy("enemy-1", 0.08, 100_000), createTestEnemy("enemy-2", 0.1, 100_000), createTestEnemy("enemy-3", 0.12, 100_000));
 
     simulation.update(1);
 
-    expect(simulation.enemies.every((enemy) => enemy.hp < enemy.maxHp)).toBe(true);
+    expect(simulation.enemies).toHaveLength(3);
+    expect(simulation.drainEvents().filter(event => event.type === 'damage').map(event => event.amount)).toEqual([225, 225, 225]);
   });
 
   test("unique control units apply poison, slow, freeze, and berserk effects", () => {

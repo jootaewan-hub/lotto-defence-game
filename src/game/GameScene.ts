@@ -10,6 +10,7 @@ import { getUnitDefinition, getUnitPortrait, getTowerType, getUniqueUnitLevel } 
 import { SUPER_COLORS } from './superUnits';
 import { getRarity } from './rarities';
 import { CombatEffects } from './CombatEffects';
+import { getSimulationStepMs } from './speed';
 const S = 1.8;
 const point = (p: {
     x: number;
@@ -189,7 +190,7 @@ export class GameScene extends Phaser.Scene {
         if (!this.ink)
             return;
         const speed = this.getSpeedMultiplier();
-        const step = Math.min(delta, 80) * speed;
+        const step = getSimulationStepMs(delta, speed);
         this.visualTime += Math.min(delta,80) * Math.min(speed,2);
         const time=this.visualTime;
         this.tweens.timeScale = Math.min(speed, 3);
@@ -200,7 +201,7 @@ export class GameScene extends Phaser.Scene {
             this.simulation.update(Math.min(40, remaining));
         this.updateBattleTheme();
         const events = this.simulation.drainEvents();
-        this.combat.emit(events);
+        this.combat.emit(speed >= 40 && events.length > 240 ? events.slice(-240) : events);
         this.combat.update(delta, speed, new Map(this.simulation.enemies.map(e => [e.id, getPathPosition(e.progress)])));
         this.ink.clear();
         const board = this.simulation.state.board;
@@ -315,7 +316,7 @@ export class GameScene extends Phaser.Scene {
             if (this.combat.isHit(id)) img.setTintFill(0xffe1ad).setAlpha(0.65);
         }
         if (events.length) {
-            this.onEvents(events);
+            this.onEvents(speed >= 40 ? events.filter(event => event.type === 'message' || event.type === 'jackpot' || event.type === 'waveComplete' || event.type === 'runEnded') : events);
         }
         if (this.simulation.state.baseHealth < this.lastHp && !this.reduced)
             this.cameras.main.shake(180, 0.003);

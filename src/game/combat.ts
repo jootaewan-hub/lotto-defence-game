@@ -11,6 +11,7 @@ import {
   isUniqueUnit,
 } from "./units";
 import { getEnemyVariant, getTrueBossDefinition } from "./enemyVariants";
+import { getDragonWeaponMagicRange, getSuperArcherTargetCount } from './superUnits';
 import {
   applyArmor,
   applyUniqueAbility,
@@ -191,7 +192,7 @@ export function attackEnemies(ctx: CombatContext, deltaMs: number): void {
     const rarity = getRarity(definition.rarity);
     const rarityTier = getRarityIndex(definition.rarity);
     const superType=definition.superUnique?getTowerType(definition):undefined;
-    const targets = superType==='mage'?ctx.enemies.filter(e=>e.hp>0):findTargets(ctx, unit, stats.range, superType==='archer'||superType==='warrior'?5:multishotStats?.targetCount ?? 1);
+    const targets = superType==='mage'?ctx.enemies.filter(e=>e.hp>0):findTargets(ctx, unit, stats.range, superType==='archer'?getSuperArcherTargetCount(uniqueLevel):superType==='warrior'?5:multishotStats?.targetCount ?? 1);
     unit.cooldownMs = stats.attackSpeed;
     if (targets.length === 0) {
       return;
@@ -199,7 +200,7 @@ export function attackEnemies(ctx: CombatContext, deltaMs: number): void {
 
     const critical = ctx.rng.next() < Math.min(0.85, stats.criticalChance + criticalChanceBonus);
     const damage = Math.round(
-      stats.attack * (superType && superType !== 'priest' ? (definition.ultimate ? 0.5 : 0.25) : 1) *
+      stats.attack * (definition.ultimate ? 0.5 : superType === 'archer' ? 1.1 : superType && superType !== 'priest' ? 0.25 : 1) *
         attackBuff *
         (definition.uniqueAbility ? 1 + uniqueAttackBonus : 1) *
         (critical ? 1.75 + ctx.bonus("criticalDamage") : 1) *
@@ -249,7 +250,8 @@ export function attackEnemies(ctx: CombatContext, deltaMs: number): void {
         }
       } else {
         const bossAdjustedDamage = Math.round(damage * (target.isBoss ? (1 + bossDamageBonus) * (superType==='archer'||superType==='warrior'?5:1) : 1));
-        const magic=weapon&&weapon.level>=7?ctx.randomInteger(500,50000):0;
+        const magicRange = weapon ? getDragonWeaponMagicRange(weapon.level) : null;
+        const magic=magicRange && magicRange.max ? ctx.randomInteger(magicRange.min,magicRange.max):0;
         if(magic)ctx.events.push({type:'superSkill',skill:'dragon-magic',sourceId:unit.instanceId,at:targetPosition});
         const reducedDamage = applyArmor(bossAdjustedDamage, target.armor * (1 - ctx.bonus("armorPierce"))) + magic;
         target.lastHitByDefinitionId = definition.id;

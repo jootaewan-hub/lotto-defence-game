@@ -251,15 +251,15 @@ test('jackpot rewards never grant fractional gold or summons', () => {
   expect(resolveJackpotReward(state, { type: 'gold', amount: 8.75 }).gold).toBe(state.gold + 9);
   expect(resolveJackpotReward(state, { type: 'freeSummon', amount: 0.25 }).freeSummons).toBe(state.freeSummons + 1);
 });
-test('boss tiers use the reduced health multipliers', () => {
+test('boss tiers receive the new challenge multipliers', () => {
   const boss = (w: number) => getBossEncounter(w)!.healthMultiplier;
   const late = (w: number) => (1 + Math.max(0, w - 20) * 0.0325) * 1.006 ** (w - 1);
-  expect(boss(5)).toBeCloseTo(5.6 * late(5));
-  expect(boss(10)).toBeCloseTo((5.6 + 0.95) * 1.5 * late(10));
-  expect(boss(20)).toBeCloseTo((5.6 + 0.95 * 3) * 1.5 * 1.15 * late(20));
-  expect(boss(30)).toBeCloseTo((5.6 + 0.95 * 5) * 1.5 * late(30));
+  expect(boss(5)).toBeCloseTo(5.6 * late(5) * 2.7);
+  expect(boss(10)).toBeCloseTo((5.6 + 0.95) * 1.5 * late(10) * 5.8);
+  expect(boss(20)).toBeCloseTo((5.6 + 0.95 * 3) * 1.5 * 1.15 * late(20) * 6.4);
+  expect(boss(30)).toBeCloseTo((5.6 + 0.95 * 5) * 1.5 * late(30) * 5.8);
 });
-test('spawned mid boss, boss and true boss health drop on normal difficulty', () => {
+test('spawned mid boss, boss and true boss health rises on normal difficulty', () => {
   const spawn = (wave: number) => {
     const sim = new GameSimulation(createDefaultMetaProgress(), createSeededRng(1));
     sim.state.board = [];
@@ -267,8 +267,7 @@ test('spawned mid boss, boss and true boss health drop on normal difficulty', ()
     sim.update(1);
     return sim.enemies[0]!.maxHp;
   };
-  expect(spawn(5)).toBeLessThan(1_650);
-  expect(spawn(10)).toBeLessThan(4_350);
-  expect(spawn(30)).toBeLessThan(26_500);
-  expect(spawn(30)).toBeGreaterThan(3_000);
+  expect(spawn(5)).toBeGreaterThan(1_650);
+  expect(spawn(10)).toBeGreaterThan(4_350);
+  expect(spawn(30)).toBeGreaterThan(26_500);
 });

@@ -97,7 +97,7 @@ test('ordinary health compounds at 1.6 percent per wave', () => {
 test('late boss growth slows without decreasing same-tier health', () => {
   const boss = (w: number) => getBossEncounter(w)!.healthMultiplier;
   const old = (w: number) => (5.6 + Math.floor((w - 1) / 5) * 0.95) * (1 + Math.max(0,w-20)*.0325) * 1.006 ** (w-1);
-  expect(boss(45)).toBeCloseTo(old(45));
-  expect(boss(115)).toBeLessThan(old(115) * .65);
+  expect(boss(45)).toBeCloseTo(old(45) * 2.7);
+  expect(boss(115)).toBeLessThan(old(115) * 2.7 * .65);
   expect(boss(115)).toBeGreaterThan(boss(55));
 });

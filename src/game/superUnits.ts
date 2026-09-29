@@ -9,17 +9,34 @@ export const SUPER_FEEDER_RARITIES = ['legendary', 'mythic', 'transcendent', 'im
 export const TOWER_TYPES: TowerType[] = ['archer', 'warrior', 'mage', 'priest'];
 export const TOWER_LABELS: Record<TowerType, string> = { archer: '궁수', warrior: '전사', mage: '마법사', priest: '사제' };
 export const SUPER_COLORS: Record<TowerType, number> = { archer: 0x70dcff, warrior: 0xffbf65, mage: 0xff735a, priest: 0xc4a0ff };
+/** Super archer gains one extra target every 20 unique levels, up to ten. */
+export function getSuperArcherTargetCount(level: number): number {
+    return Math.min(10, 5 + Math.floor((Math.max(1, Math.floor(level)) - 1) / 20));
+}
 export const DRAGON_ITEMS: {
     kind: DragonItemKind;
     name: string;
     price: number;
     description: string;
 }[] = [
-    { kind: 'weapon', name: '드래곤 무기', price: 10000, description: '공격력 +100, 강화마다 +50. +7부터 매 공격에 방어 무시 마법 피해 500~50,000 자동 발동.' },
-    { kind: 'ring', name: '드래곤 반지', price: 10000, description: '공격마다 10% 확률로 맵 전체에 마법 피해 50. 강화 성공마다 피해량 +50~500.' },
+    { kind: 'weapon', name: '드래곤 무기', price: 10000, description: '공격력 +100, +1~6 강화마다 +50, +7부터 공격력 급증. +1부터 매 공격에 방어 무시 마법 피해가 강화 단계의 제곱으로 증가.' },
+    { kind: 'ring', name: '드래곤 반지', price: 10000, description: '공격마다 10% 확률로 맵 전체에 마법 피해 50. +7부터 강화 피해 증가량이 제곱 곡선으로 증가.' },
     { kind: 'boots', name: '드래곤 신발', price: 10000, description: '구매 즉시, 이후 매 웨이브마다 공격속도 +5~40% 추첨. 강화 성공마다 추가 속도 +5~40% 누적.' },
 ];
 export function getItemUpgradeCost(targetLevel: number): number { return targetLevel <= 3 ? 10000 : (targetLevel - 2) * 10000; }
+/** +7부터 성공 강화의 공격력 누적분에 이차 곡선을 더한다. */
+export function getDragonWeaponAttackBonus(level: number): number {
+    const stage = Math.max(0, Math.min(MAX_ITEM_UPGRADE_LEVEL, level));
+    return 50 * stage + 80 * Math.max(0, stage - 6) ** 2;
+}
+export function getDragonWeaponMagicRange(level: number): { min: number; max: number } {
+    if (level < 1) return { min: 0, max: 0 };
+    const stage = Math.min(MAX_ITEM_UPGRADE_LEVEL, level);
+    return { min: Math.round(10 * stage ** 2), max: Math.round(1_000 * stage ** 2) };
+}
+export function getDragonRingDamageGain(level: number, baseRoll: number): number {
+    return Math.round(baseRoll * (1 + 0.06 * Math.max(0, Math.min(MAX_ITEM_UPGRADE_LEVEL, level) - 6) ** 2));
+}
 export function getItemUpgradeChance(targetLevel: number): number {
     if (!Number.isInteger(targetLevel) || targetLevel < 1 || targetLevel > MAX_ITEM_UPGRADE_LEVEL) return 0;
     if (targetLevel <= 4) return 1;

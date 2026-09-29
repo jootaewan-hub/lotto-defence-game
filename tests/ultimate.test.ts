@@ -4,6 +4,7 @@ import { createDefaultMetaProgress, createSeededRng } from '../src/game/systems'
 import { getUnitDefinition, getUnitsByRarity } from '../src/game/units';
 import type { EnemyState, UnitInstance } from '../src/game/types';
 import { superForgeMarkup } from '../src/superUi';
+import { TOWER_SPAWN } from '../src/game/geometry';
 
 const game = () => new GameSimulation(createDefaultMetaProgress(), createSeededRng(8));
 const ingredients = (): UnitInstance[] => ['archer','warrior','mage','priest'].map((type, i) => ({instanceId:`s${i}`,definitionId:`super-${type}`,x:150+i*30,y:148,cooldownMs:0,attackUpgradePercent:10,speedUpgradePercent:5,upgradeCount:2,upgradeGoldSpent:65,items:[{kind:'weapon',level:i+1,bonus:100*(i+1)}]}));
@@ -13,7 +14,7 @@ test('ultimate consumes exactly four distinct supers and 20000 gold, inheriting 
   const sim=game(); sim.state.board=ingredients(); sim.state.gold=20000;
   expect(sim.craftUltimate()).toBe(true);
   expect(sim.state.gold).toBe(0); expect(sim.state.board).toHaveLength(1);
-  expect(sim.state.board[0]).toMatchObject({definitionId:'ultimate-mugeuk',attackUpgradePercent:40,speedUpgradePercent:20,upgradeCount:8,upgradeGoldSpent:260,items:[{kind:'weapon',level:4,bonus:1000}]});
+  expect(sim.state.board[0]).toMatchObject({definitionId:'ultimate-mugeuk',...TOWER_SPAWN,attackUpgradePercent:40,speedUpgradePercent:20,upgradeCount:8,upgradeGoldSpent:260,items:[{kind:'weapon',level:4,bonus:1000}]});
   expect(sim.meta.uniqueUnitLevels['ultimate-mugeuk']).toBe(1);
   sim.state.gold=20000; sim.state.board.push(...ingredients());
   const before=JSON.stringify(sim.state); expect(sim.craftUltimate()).toBe(false); expect(JSON.stringify(sim.state)).toBe(before);
@@ -81,4 +82,16 @@ test('heaven split hits distant armored enemies, doubles boss damage, and respec
   sim.pendingReward=true; sim.update(12000); expect(sim.state.board[0]!.ultimateCooldownMs).toBe(cooldown);
   sim.pendingReward=false; sim.update(12000);
   expect(sim.drainEvents()).toContainEqual(expect.objectContaining({type:'superSkill',skill:'heaven-split'}));
+});
+
+test('all three ultimate skills trigger when the first wave enemy appears', () => {
+  const sim = game();
+  sim.state.board = [{instanceId:'u',definitionId:'ultimate-mugeuk',x:150,y:148,cooldownMs:1e9}];
+  sim.startNextWave();
+  sim.update(1);
+  const events = sim.drainEvents();
+  const skills = events.filter(event => event.type === 'superSkill').map(event => event.skill);
+  expect(skills).toEqual(expect.arrayContaining(['berserk', 'blessing', 'heaven-split']));
+  expect(events.some(event => event.type === 'damage' && event.amount > 0)).toBe(true);
+  expect(sim.state.board[0]!.ultimateCooldownMs).toBe(12000);
 });
