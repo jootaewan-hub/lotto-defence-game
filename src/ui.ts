@@ -240,10 +240,10 @@ export function createUi(sim: GameSimulation, persistProgress = true): UiHandle 
         if (bosses.length > 2) bossBars.push({label: `추가 보스 ${bosses.length - 2}기 · 합산 체력`, hp: bosses.slice(2).reduce((sum,e)=>sum+Math.max(0,e.hp),0), maxHp: bosses.slice(2).reduce((sum,e)=>sum+e.maxHp,0)});
         bossHud.innerHTML = bossBars.map(e => `<div class="boss-health"><div><b>${e.label}</b><span>${Math.ceil(e.hp).toLocaleString()} / ${Math.ceil(e.maxHp).toLocaleString()}</span></div><progress aria-label="${e.label} 체력" max="${e.maxHp}" value="${e.hp}"></progress></div>`).join('');
         q('wave-count').textContent = String(s.wave).padStart(2, '0');
-        q('hp-count').textContent = `${s.baseHealth} / ${s.maxBaseHealth}`;
+        q('hp-count').textContent = `${Math.round(s.baseHealth)} / ${Math.round(s.maxBaseHealth)}`;
         q('hp-bar').style.width = `${100 * s.baseHealth / s.maxBaseHealth}%`;
         q('hp-bar').classList.toggle('danger', s.baseHealth < 6);
-        q('gold-count').textContent = s.gold.toLocaleString();
+        q('gold-count').textContent = Math.round(s.gold).toLocaleString();
         const recommendedDps=sim.getRecommendedDps(),currentDps=sim.getCurrentDps();
         q('dps-target').textContent=recommendedDps?formatDps(recommendedDps):'—';
         q('dps-current').textContent=formatDps(currentDps);

@@ -366,8 +366,14 @@ export class GameSimulation {
       unit.upgradeCount = (unit.upgradeCount ?? 0) + 1;
       unit.upgradeGoldSpent = (unit.upgradeGoldSpent ?? 0) + (roll.cost ?? 0);
     } else {
-      this.upgrades[roll.stat] = Math.round((this.getUpgradeValue(roll.stat) + roll.value)*100)/100;
-      if (roll.stat === 'maxHealth') { this.state.maxBaseHealth += roll.value; this.state.baseHealth += roll.value; }
+      const wholeReward = roll.stat === 'waveGold' || roll.stat === 'maxHealth' || roll.stat === 'regeneration';
+      this.upgrades[roll.stat] = wholeReward
+        ? Math.round(this.getUpgradeValue(roll.stat) + roll.value)
+        : Math.round((this.getUpgradeValue(roll.stat) + roll.value)*100)/100;
+      if (roll.stat === 'maxHealth') {
+        this.state.maxBaseHealth = Math.round(this.state.maxBaseHealth + roll.value);
+        this.state.baseHealth = Math.min(this.state.maxBaseHealth, Math.round(this.state.baseHealth + roll.value));
+      }
       this.rewardHistory.push({ ...roll });
       this.pendingReward = false;
       this.rewardChoices = [];
@@ -534,8 +540,9 @@ export class GameSimulation {
   private beginStage(stage: WaveDefinition, waveNumber: number): void {
     for(const unit of this.state.board)for(const item of unit.items??[])if(item.kind==='boots')item.waveSpeedPercent=this.randomInteger(5,40);
     const income = this.getUpgradeValue('waveGold') + Math.min(100, Math.floor(this.state.gold * this.bonus('interest')));
-    this.state.gold += income;
-    this.state.baseHealth = Math.min(this.state.maxBaseHealth, this.state.baseHealth + this.getUpgradeValue('regeneration'));
+    this.state.gold = Math.round(this.state.gold + income);
+    this.state.maxBaseHealth = Math.round(this.state.maxBaseHealth);
+    this.state.baseHealth = Math.min(this.state.maxBaseHealth, Math.round(this.state.baseHealth + this.getUpgradeValue('regeneration')));
     this.state = { ...this.state, waveTimeRemainingMs: stage.durationMs, status: "running" };
     // A boss stage sends exactly the opponents it declares; ordinary waves keep
     // spawning for as long as the wave lasts.
@@ -1096,7 +1103,7 @@ export class GameSimulation {
     const survivorDamage = rawSurvivorDamage > 0 ? Math.max(1, Math.ceil(rawSurvivorDamage * (1 - damageReduction))) : 0;
     this.enemies.splice(0);
     this.combatCounters.remainingSpawns = 0;
-    const baseHealth = Math.max(0, this.state.baseHealth - survivorDamage);
+    const baseHealth = Math.max(0, Math.round(this.state.baseHealth) - survivorDamage);
     this.state = { ...this.state, baseHealth };
     if (survivorDamage > 0) {
       this.events.push({ type: "message", text: `남은 몬스터 피해 -${survivorDamage} HP` });

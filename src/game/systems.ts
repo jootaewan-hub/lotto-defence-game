@@ -180,7 +180,7 @@ const JACKPOT_FREE_SUMMON_REWARD = 1;
 
 export function resolveJackpotReward(state: RunState, reward: JackpotReward): RunState {
   if (reward.type === "gold") {
-    return { ...state, gold: state.gold + Math.ceil(reward.amount) };
+    return { ...state, gold: Math.round(state.gold + Math.ceil(reward.amount)) };
   }
   if (reward.type === "freeSummon") {
     return { ...state, freeSummons: state.freeSummons + Math.ceil(reward.amount) };

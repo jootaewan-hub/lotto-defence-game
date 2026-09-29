@@ -23,6 +23,35 @@ describe('random blessings and gold forging', () => {
         expect(sim.frostCooldownMs).toBe(18000);
         expect(sim.enemies[0]!.effects).toContainEqual(expect.objectContaining({ kind: 'freeze', remainingMs: 3600 }));
     });
+    test('flat health and wave-gold blessings use whole amounts', () => {
+        for (const stat of ['maxHealth', 'regeneration', 'waveGold'] as const) {
+            const reward = REWARD_POOL.find(entry => entry.stat === stat)!;
+            expect(Number.isInteger(reward.min)).toBe(true);
+            expect(Number.isInteger(reward.max)).toBe(true);
+            const sim = game();
+            sim.pendingReward = true;
+            sim.rewardChoices = [reward];
+            const roll = sim.rollReward(stat)!;
+            expect(Number.isInteger(roll.value)).toBe(true);
+            expect(sim.resolveUpgradeRoll()).toBe(true);
+            expect(Number.isInteger(sim.getUpgradeValue(stat))).toBe(true);
+        }
+    });
+    test('wave income, healing and survivor damage keep resources whole', () => {
+        const sim = game();
+        sim.state.gold = 100.6;
+        sim.state.baseHealth = 18.4;
+        sim.state.maxBaseHealth = 20.2;
+        sim.upgrades.waveGold = 1.5;
+        sim.upgrades.regeneration = 0.75;
+        sim.startNextWave();
+        expect(sim.state.gold).toBe(102);
+        expect(sim.state.baseHealth).toBe(19);
+        expect(sim.state.maxBaseHealth).toBe(20);
+        sim.state.baseHealth = 18.4;
+        sim.update(sim.waves[0]!.durationMs);
+        expect(Number.isInteger(sim.state.baseHealth)).toBe(true);
+    });
     test('paid upgrades pause combat during rolling and affect actual dealt damage', () => {
         const sim = game();
         sim.state.board = [{ instanceId: 'forged', definitionId: 'common-single', cooldownMs: 0, x: 110, y: 148 }];

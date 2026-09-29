@@ -302,7 +302,7 @@ export function collectDefeatedEnemies(ctx: CombatContext): void {
     goldReward.amount += extraGold;
     ctx.state = {
       ...ctx.state,
-      gold: ctx.state.gold + goldReward.amount,
+      gold: Math.round(ctx.state.gold + goldReward.amount),
       defeatedEnemies: ctx.state.defeatedEnemies + 1,
     };
     ctx.events.push({ type: "goldReward", at: position, amount: goldReward.amount, tier: goldReward.tier });
