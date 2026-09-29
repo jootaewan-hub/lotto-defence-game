@@ -65,12 +65,14 @@ export interface CombatContext {
     remainingSpawns: number;
     spawnTimerMs: number;
     jackpotMisses: number;
+    synergyGoldCarry: number;
   };
   bonus(stat: UpgradeStat): number;
   getBuffMultiplier(stat: "attack" | "attackSpeed"): number;
   randomInteger(min: number, max: number): number;
   getSuperAura(): number;
   getJackpotChance(): number;
+  getSynergyGoldBonus(): number;
   getTowerCombatStats(
     slot: number,
     shared?: { formation: number; aura: number },
@@ -289,8 +291,13 @@ export function collectDefeatedEnemies(ctx: CombatContext): void {
 
     const position = getPathPosition(enemy.progress);
     ctx.enemies.splice(index, 1);
-    const goldBonus = 1 + getSkillEffectTotal(ctx.meta, "goldBonus") + ctx.bonus("goldBonus");
+    const synergyGoldBonus = ctx.getSynergyGoldBonus();
+    const goldBonus = 1 + getSkillEffectTotal(ctx.meta, "goldBonus") + ctx.bonus("goldBonus") - synergyGoldBonus;
     const goldReward = rollKillGoldReward(Math.round(enemy.rewardGold * goldBonus), ctx.rng);
+    const fractionalBonus = goldReward.amount * synergyGoldBonus + ctx.combatCounters.synergyGoldCarry;
+    const extraGold = Math.floor(fractionalBonus + 1e-9);
+    ctx.combatCounters.synergyGoldCarry = fractionalBonus - extraGold;
+    goldReward.amount += extraGold;
     ctx.state = {
       ...ctx.state,
       gold: ctx.state.gold + goldReward.amount,

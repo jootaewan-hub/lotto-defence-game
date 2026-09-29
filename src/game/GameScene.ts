@@ -225,10 +225,6 @@ export class GameScene extends Phaser.Scene {
                 this.ink.lineStyle(1, 0x95dfca, 0.3);
                 this.ink.strokeEllipse(p.x, p.y, range * S * 2, range * 1.25 * 2);
             }
-            this.ink.fillStyle(0x030d12, 0.65);
-            this.ink.fillEllipse(p.x, p.y + 13, 43, 17);
-            this.ink.lineStyle(i === this.selected ? 3 : 1.4, i === this.selected ? 0xffdf95 : color, 0.8);
-            this.ink.strokeEllipse(p.x, p.y + 10, 43, 20);
             if (mergeable.has(i)) {
                 this.ink.fillStyle(0xffda8c, 0.85);
                 this.ink.fillCircle(p.x + 20, p.y - 28, 3);
@@ -256,7 +252,7 @@ export class GameScene extends Phaser.Scene {
             const size = visual.size;
             let badge = this.stageLabels.get(u.instanceId);
             if (!badge) {
-                badge = this.add.text(p.x, p.y + 17, visual.badge, { fontFamily: 'sans-serif', fontSize: '8px', fontStyle: 'bold', color: def.superUnique ? '#ffdf8a' : rarity.color, backgroundColor: '#10212c', padding: { x: 1, y: 0 } }).setOrigin(.5).setDepth(7);
+                badge = this.add.text(p.x, p.y + 17, visual.badge, { fontFamily: 'sans-serif', fontSize: '7px', fontStyle: 'bold', color: def.superUnique ? '#ffdf8a' : rarity.color, stroke: '#10212c', strokeThickness: 1 }).setOrigin(.5).setDepth(7);
                 this.stageLabels.set(u.instanceId, badge);
             }
             badge.setPosition(p.x, p.y + 17);

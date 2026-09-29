@@ -49,6 +49,7 @@ import { getWaveCleanupWindowMs } from "./combatMath";
 export { getEnemyExperienceReward } from "./combatMath";
 import { compareUnitsForArrangement, createTowerEdgeCandidates } from "./towerArrangement";
 import { getExpectedTowerDps, getRecommendedDps } from './dps';
+import { getActiveSynergies } from './synergies';
 import { attackEnemies, moveEnemies, spawnEnemies, tickBuffs, tickEnemyEffects } from "./combat";
 
 export interface MergePrompt {
@@ -120,6 +121,7 @@ const JACKPOT_PITY_MAX_BONUS = 0.06;
 const NEXT_WAVE_DELAY_MS = 5_000;
 const RARE_RARITY_INDEX = getRarityIndex("rare");
 const EPIC_RARITY_INDEX = getRarityIndex("epic");
+const UNIQUE_CLASS_LIMIT = 3;
 
 export class GameSimulation {
   get difficulty() { return DIFFICULTIES[this.state.difficulty]; }
@@ -183,7 +185,20 @@ export class GameSimulation {
 
   getUpgradeValue(stat: UpgradeStat): number { return this.upgrades[stat] ?? 0; }
   /** 내부 전용. combat.ts가 CombatContext로 접근하므로 private이 아니다. 소비자 API는 아니다. */
-  bonus(stat: UpgradeStat): number { return this.getUpgradeValue(stat) / 100; }
+  private synergyBoard: UnitInstance[] | null = null;
+  private activeSynergyCache: ReturnType<typeof getActiveSynergies> = [];
+  getActiveSynergies() {
+    if (this.synergyBoard !== this.state.board) {
+      this.synergyBoard = this.state.board;
+      this.activeSynergyCache = getActiveSynergies(this.state.board);
+    }
+    return this.activeSynergyCache;
+  }
+  private synergyBonus(stat: UpgradeStat): number {
+    return this.getActiveSynergies().reduce((total, entry) => total + (entry.stat === stat ? entry.amount : 0), 0) / 100;
+  }
+  getSynergyGoldBonus(): number { return this.synergyBonus('goldBonus'); }
+  bonus(stat: UpgradeStat): number { return this.getUpgradeValue(stat) / 100 + (stat === 'attack' ? 0 : this.synergyBonus(stat)); }
   get expeditionAttackBonus(): number { return this.bonus('attack'); }
   set expeditionAttackBonus(value: number) { this.upgrades.attack = value * 100; }
 
@@ -366,7 +381,7 @@ export class GameSimulation {
   frostCooldownMs = 0;
 
   get formationBonus(): number {
-    return new Set(this.state.board.map(unit => getUnitDefinition(unit.definitionId).role)).size === 3 ? 0.15 : 0;
+    return this.synergyBonus('attack');
   }
 
   castFrost(): boolean {
@@ -395,6 +410,7 @@ export class GameSimulation {
     remainingSpawns: 0,
     spawnTimerMs: 0,
     jackpotMisses: 0,
+    synergyGoldCarry: 0,
   };
 
   constructor(meta: MetaProgress, rng: Rng = createRandomRng()) {
@@ -429,6 +445,7 @@ export class GameSimulation {
     this.rareDrySummons = 0;
     this.epicDrySummons = 0;
     this.combatCounters.jackpotMisses = 0;
+    this.combatCounters.synergyGoldCarry = 0;
     this.state = createInitialRunState(this.meta);
     this.events.push({ type: "message", text: "새로운 방어를 시작합니다." });
     return true;
@@ -629,7 +646,9 @@ export class GameSimulation {
       const key = `${definition.rarity}:${getTowerType(definition)}`;
       const reserved = (SUPER_FEEDER_RARITIES as readonly string[]).includes(definition.rarity) ? SUPER_INGREDIENT_COUNT : 0;
       if ((held.get(key) ?? 0) - group.length < reserved) continue;
+      const boardBeforeMerge = this.state.board;
       const prompt = this.requestMerge(group[0]!);
+      if (this.state.board !== boardBeforeMerge) return true;
       if (prompt) {
         this.chooseMergeCandidate(prompt.candidates[0]!.id);
         return true;
@@ -843,6 +862,33 @@ export class GameSimulation {
     return true;
   }
 
+  /** Change one ordinary immortal or unique into a different class at the same grade. */
+  canRerollTowerType(slot: number): boolean {
+    if (!this.canManageTowers() || this.state.gold < 1000) return false;
+    const unit = this.state.board[slot];
+    if (!unit) return false;
+    const source = getUnitDefinition(unit.definitionId);
+    if (source.superUnique || (source.rarity !== 'immortal' && source.rarity !== 'unique')) return false;
+    return getUnitsByRarity(source.rarity).some(candidate =>
+      getTowerType(candidate) !== getTowerType(source) &&
+      (candidate.rarity !== 'unique' || this.getUniqueClassCount(getTowerType(candidate)) < UNIQUE_CLASS_LIMIT));
+  }
+  rerollTowerType(slot: number): boolean {
+    if (!this.canRerollTowerType(slot)) return false;
+    const unit = this.state.board[slot]!;
+    const source = getUnitDefinition(unit.definitionId);
+    const candidates = getUnitsByRarity(source.rarity).filter(candidate =>
+      getTowerType(candidate) !== getTowerType(source) &&
+      (candidate.rarity !== 'unique' || this.getUniqueClassCount(getTowerType(candidate)) < UNIQUE_CLASS_LIMIT));
+    const replacement = this.rng.pick(candidates);
+    const board = [...this.state.board];
+    board[slot] = { ...unit, instanceId: `unit-${this.unitSequence += 1}`, definitionId: replacement.id, cooldownMs: 150, berserkRemainingMs: 0 };
+    this.state = { ...this.state, board, gold: this.state.gold - 1000 };
+    this.meta = registerUniqueUnitAcquisition(this.meta, replacement.id);
+    this.events.push({ type: 'message', text: `${source.name} → ${replacement.name} 유형 변경 -1,000G` });
+    return true;
+  }
+
   requestMerge(slot?: number): MergePrompt | null {
     if (this.pendingRoll || this.pendingReward) return null;
     const targetSlot = slot ?? this.state.board.findIndex((entry, index) =>
@@ -862,9 +908,19 @@ export class GameSimulation {
     const source = this.state.board[targetSlot]!;
     if (!this.canMergeUnit(source.definitionId)) return null;
     try {
+      const candidates = createMergeCandidates(source.definitionId, this.rng);
+      const sourceSlots = [targetSlot, ...matchingSlots.filter((matchingSlot) => matchingSlot !== targetSlot)].slice(0, required);
+      const sourceRarity = getUnitDefinition(source.definitionId).rarity;
+      if (sourceRarity === 'mythic' || sourceRarity === 'transcendent') {
+        const candidate = candidates[0]!;
+        if (this.applyMerge(sourceSlots, candidate)) {
+          this.events.push({ type: 'message', text: `${candidate.name} 무작위 합성 성공!` });
+        }
+        return null;
+      }
       this.pendingMerge = {
-        sourceSlots: [targetSlot, ...matchingSlots.filter((matchingSlot) => matchingSlot !== targetSlot)].slice(0, required),
-        candidates: createMergeCandidates(source.definitionId, this.rng),
+        sourceSlots,
+        candidates,
       };
       return this.pendingMerge;
     } catch (error) {
@@ -954,7 +1010,14 @@ export class GameSimulation {
 
   private canMergeUnit(id: string): boolean {
     const d = getUnitDefinition(id);
-    return !isUniqueUnit(d) && (d.rarity !== 'immortal' || this.state.board.filter(u => Boolean(getUnitDefinition(u.definitionId).uniqueAbility)).length < 2);
+    return !isUniqueUnit(d) && (d.rarity !== 'immortal' || this.getUniqueClassCount(getTowerType(d)) < UNIQUE_CLASS_LIMIT);
+  }
+
+  private getUniqueClassCount(type: TowerType): number {
+    return this.state.board.filter(unit => {
+      const definition = getUnitDefinition(unit.definitionId);
+      return Boolean(definition.uniqueAbility) && getTowerType(definition) === type;
+    }).length;
   }
 
   private applyMerge(sourceSlots: number[], candidate: UnitDefinition): boolean {
@@ -1165,7 +1228,7 @@ export class GameSimulation {
     // Uniques are not a rarity, so the legendary summon draws them ahead of the
     // rarity table. A unique skips the pity counters entirely.
     if (kind === "legendary") {
-      const uniqueUnit = rollSummonUniqueUnit(this.rng);
+      const uniqueUnit = rollSummonUniqueUnit(this.rng, unit => this.getUniqueClassCount(getTowerType(unit)) < UNIQUE_CLASS_LIMIT);
       if (uniqueUnit) {
         return { unit: uniqueUnit, pityActivated: false };
       }

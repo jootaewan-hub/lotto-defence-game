@@ -152,7 +152,7 @@ test('auto summon builds and merges an army on its own', () => {
   sim.autoProgress = true;
   sim.autoSummon = true;
 
-  for (let t = 0; t < 30_000; t += 100) {
+  for (let t = 0; t < 60_000; t += 100) {
     sim.update(100);
     if (sim.pendingReward) { sim.pendingReward = false; sim.rewardChoices = []; }
   }
@@ -192,16 +192,13 @@ test('upgrading supports fractional small gains', () => {
 });
 
 const board = (ids: string[]) => ids.map((definitionId, i) => ({definitionId, instanceId: `r${i}`, cooldownMs: 0, x: 120, y: 148}));
-test('unique cap stops manual and bulk fusion without consuming ingredients', () => {
+test('existing uniques do not block immortal fusion', () => {
   const sim = new GameSimulation(createDefaultMetaProgress(), createSeededRng(2));
   sim.state.board = board(['mythic-ranger', 'immortal-berserker', ...Array(3).fill('immortal-single')]);
-  const before = JSON.stringify(sim.state);
-  expect(sim.requestMerge(2)).toBeNull();
-  expect(sim.bulkMergeAll()).toBe(0);
-  expect(JSON.stringify(sim.state)).toBe(before);
-  sim.sellUnit(0);
+  expect(sim.requestMerge(2)?.sourceSlots).toEqual([2, 3, 4]);
+  sim.cancelMerge();
   expect(sim.bulkMergeAll()).toBe(1);
-  expect(sim.state.board.filter(u => ['mythic-ranger','immortal-berserker','mythic-plague-warlock','transcendent-time-mage','transcendent-frost-witch'].includes(u.definitionId))).toHaveLength(2);
+  expect(sim.state.board.filter(u => getUnitDefinition(u.definitionId).rarity === 'unique')).toHaveLength(3);
 });
 test('stage merge leaves higher and unrelated stages untouched', () => {
   const sim = new GameSimulation(createDefaultMetaProgress(), createSeededRng(2));

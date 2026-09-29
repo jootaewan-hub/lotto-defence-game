@@ -90,7 +90,7 @@ describe("lotto defence game systems", () => {
     }
   });
 
-  test("merge candidates are three next-rarity choices", () => {
+  test("merges before mythic keep the same class", () => {
     const rng = createSeededRng(7);
     const source = UNIT_DEFINITIONS.find((unit) => unit.rarity === "rare" && unit.role === "single");
 
@@ -98,9 +98,22 @@ describe("lotto defence game systems", () => {
 
     const candidates = createMergeCandidates(source!.id, rng);
 
-    expect(candidates).toHaveLength(3);
+    expect(candidates).toHaveLength(1);
     for (const candidate of candidates) {
       expect(getRarityIndex(candidate.rarity)).toBe(getRarityIndex(source!.rarity) + 1);
+      expect(getTowerType(candidate)).toBe(getTowerType(source!));
+    }
+  });
+
+  test("mythic and transcendent mergers roll one class from all four", () => {
+    for (const rarity of ['mythic', 'transcendent'] as const) {
+      const classes = new Set<string>();
+      for (let seed = 1; seed <= 40; seed++) {
+        const candidate = createMergeCandidates(`${rarity}-single`, createSeededRng(seed));
+        expect(candidate).toHaveLength(1);
+        classes.add(getTowerType(candidate[0]!));
+      }
+      expect(classes.size).toBe(4);
     }
   });
 
@@ -158,8 +171,8 @@ describe("lotto defence game systems", () => {
     }
   });
 
-  test("two immortals fuse into a unique while other tiers still need three", () => {
-    expect(getMergeRequirement("immortal")).toBe(2);
+  test("three immortals fuse into a unique like other tiers", () => {
+    expect(getMergeRequirement("immortal")).toBe(3);
     for (const rarity of ["common", "rare", "legendary", "mythic", "transcendent"] as const) {
       expect(getMergeRequirement(rarity)).toBe(3);
     }
@@ -170,12 +183,13 @@ describe("lotto defence game systems", () => {
       board: [
         createTestUnit("immortal-1", "immortal-single", 120, 148),
         createTestUnit("immortal-2", "immortal-single", 148, 148),
+        createTestUnit("immortal-3", "immortal-single", 192, 148),
       ],
     };
 
     const prompt = simulation.requestMerge(0)!;
     expect(prompt).not.toBeNull();
-    expect(prompt.sourceSlots).toEqual([0, 1]);
+    expect(prompt.sourceSlots).toEqual([0, 1, 2]);
     expect(prompt.candidates.every((candidate) => candidate.rarity === "unique")).toBe(true);
     expect(prompt.candidates.every((candidate) => Boolean(candidate.uniqueAbility))).toBe(true);
   });
@@ -185,7 +199,7 @@ describe("lotto defence game systems", () => {
       const simulation = new GameSimulation(createDefaultMetaProgress(), createSeededRng(11));
       simulation.state = {
         ...simulation.state,
-        board: [createTestUnit("a", source, 120, 148), createTestUnit("b", source, 148, 148)],
+        board: [createTestUnit("a", source, 120, 148), createTestUnit("b", source, 148, 148), createTestUnit("c", source, 192, 148)],
       };
 
       const prompt = simulation.requestMerge(0)!;
@@ -212,10 +226,8 @@ describe("lotto defence game systems", () => {
       ],
     };
 
-    // commons still fuse in threes; immortals pair into a unique, so the third
-    // immortal has no partner and is not mergeable on its own
-    expect([...simulation.getMergeableSlots()].sort((a, b) => a - b)).toEqual([0, 1, 2, 3, 4]);
-    expect(simulation.getMergeableGroups()).toEqual([[0, 1, 2], [3, 4]]);
+    expect([...simulation.getMergeableSlots()].sort((a, b) => a - b)).toEqual([0, 1, 2, 3, 4, 5]);
+    expect(simulation.getMergeableGroups()).toEqual([[0, 1, 2], [3, 4, 5]]);
   });
 
   test("waves contain 120 ordinary rounds, with bosses as stages that follow every fifth", () => {

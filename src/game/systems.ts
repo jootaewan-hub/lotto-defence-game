@@ -130,11 +130,11 @@ export function pickRarity(rng: Pick<Rng, "next">, kind: SummonKind = "normal"):
  * cannot live in the rarity table and are rolled ahead of it. Super uniques
  * stay awakening-only.
  */
-export function rollSummonUniqueUnit(rng: Pick<Rng, "next" | "pick">): UnitDefinition | null {
+export function rollSummonUniqueUnit(rng: Pick<Rng, "next" | "pick">, allowed: (unit: UnitDefinition) => boolean = () => true): UnitDefinition | null {
   if (rng.next() >= LEGENDARY_UNIQUE_CHANCE) {
     return null;
   }
-  const candidates = UNIT_DEFINITIONS.filter((unit) => unit.uniqueAbility && !unit.superUnique);
+  const candidates = UNIT_DEFINITIONS.filter((unit) => unit.uniqueAbility && !unit.superUnique && allowed(unit));
   return candidates.length ? rng.pick(candidates) : null;
 }
 
@@ -144,9 +144,9 @@ export function getFailureGrowthShards(wave: number, defeatedEnemies: number, bo
   return Math.max(3, Math.round((waveReward + killReward) * (1 + Math.max(0, bonus))));
 }
 
-/** Every tier fuses three of a kind, except immortals, which pair into a unique. */
+/** Every tier fuses three identical guardians. */
 export const DEFAULT_MERGE_COUNT = 3;
-export const IMMORTAL_MERGE_COUNT = 2;
+export const IMMORTAL_MERGE_COUNT = 3;
 
 export function getMergeRequirement(rarity: RarityId): number {
   return rarity === "immortal" ? IMMORTAL_MERGE_COUNT : DEFAULT_MERGE_COUNT;
@@ -162,19 +162,16 @@ export function createMergeCandidates(sourceUnitId: string, rng: Rng): UnitDefin
   const nextRarity = RARITIES[sourceIndex + 1];
 
   if (isUniqueUnit(source)) throw new Error("유니크는 일반 합성할 수 없습니다.");
-  // Unique is a real rarity now, so merging immortals reaches it the same way
-  // every other tier is reached. Uniques alone are type-bound: two immortal
-  // mages fuse into a mage unique, never into an archer one.
   const pool = nextRarity ? getUnitsByRarity(nextRarity.id) : [];
-  const candidates = nextRarity?.id === "unique"
-    ? pool.filter((unit) => getTowerType(unit) === getTowerType(source))
-    : pool;
+  const candidates = source.rarity === 'mythic' || source.rarity === 'transcendent'
+    ? pool
+    : pool.filter((unit) => getTowerType(unit) === getTowerType(source));
   for (let index = candidates.length - 1; index > 0; index -= 1) {
     const swapIndex = Math.floor(rng.next() * (index + 1));
     [candidates[index], candidates[swapIndex]] = [candidates[swapIndex]!, candidates[index]!];
   }
 
-  return candidates.slice(0, 3);
+  return candidates.slice(0, source.rarity === 'mythic' || source.rarity === 'transcendent' ? 1 : 3);
 }
 
 /** Jackpot payouts are always whole units: gold rounds up, a summon ticket is one full draw. */

@@ -5,10 +5,12 @@ import { GameSimulation } from '../src/game/simulation';
 import { createDefaultMetaProgress, createSeededRng } from '../src/game/systems';
 const game = () => new GameSimulation(createDefaultMetaProgress(), createSeededRng(27));
 describe('expedition tactics', () => {
-    test('a mixed formation activates the combined-arms bonus', () => {
+    test('a class and grade band needs three guardians for a synergy', () => {
         const sim = game();
         sim.state.board = ['single', 'area', 'support'].map((role, i) => ({ instanceId: `${i}`, definitionId: `common-${role}`, cooldownMs: 0, x: 195, y: 239 }));
-        expect(sim.formationBonus).toBe(0.15);
+        expect(sim.formationBonus).toBe(0);
+        sim.state.board = ['common-single', 'advanced-single', 'common-single'].map((definitionId, i) => ({ instanceId: `${i}`, definitionId, cooldownMs: 0, x: 195, y: 239 }));
+        expect(sim.formationBonus).toBe(0.03);
         sim.sellUnit(2);
         expect(sim.formationBonus).toBe(0);
     });
